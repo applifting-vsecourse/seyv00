@@ -3,8 +3,9 @@
 import { Quack } from '@/modules/quack/domain/quack';
 import { QuackRepository } from '@/modules/quack/repositories/quack.repository';
 import { Identity } from '@/shared/auth/domain/identity';
+import { Logger } from '@nestjs/common';
 import { mock } from 'jest-mock-extended';
-import { QuacksService } from './quacks.service';
+import { parseSearchTerm, QuacksService } from './quacks.service';
 
 const aQuack = (overrides: Partial<Quack> = {}): Quack => ({
   id: 'q1',
@@ -64,5 +65,75 @@ describe('QuacksService', () => {
       mood: 'silly',
       userId: 'u1',
     });
+  });
+
+  describe('searchQuacks', () => {
+    const user = { id: 'u1' } as Identity;
+
+    // Keep test output clean; the logging test inspects these calls.
+    beforeEach(() =>
+      jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined),
+    );
+    afterEach(() => jest.restoreAllMocks());
+
+    it('returns the full feed for an empty or whitespace-only search', async () => {
+      const quacks = [aQuack()];
+      const repository = mock<QuackRepository>();
+      repository.getQuacks.mockResolvedValue(quacks);
+      const service = new QuacksService(repository);
+
+      await expect(service.searchQuacks(user, undefined)).resolves.toEqual(
+        quacks,
+      );
+      await expect(service.searchQuacks(user, '   ')).resolves.toEqual(quacks);
+      expect(repository.searchQuacks).not.toHaveBeenCalled();
+    });
+
+    it('searches by the parsed words', async () => {
+      const quacks = [aQuack()];
+      const repository = mock<QuackRepository>();
+      repository.searchQuacks.mockResolvedValue(quacks);
+      const service = new QuacksService(repository);
+
+      await expect(
+        service.searchQuacks(user, ' pants  @CaffeinatedDuck '),
+      ).resolves.toEqual(quacks);
+      expect(repository.searchQuacks).toHaveBeenCalledWith([
+        'pants',
+        'CaffeinatedDuck',
+      ]);
+    });
+
+    it('logs usage without the search text', async () => {
+      const log = jest
+        .spyOn(Logger.prototype, 'log')
+        .mockImplementation(() => undefined);
+      const repository = mock<QuackRepository>();
+      repository.searchQuacks.mockResolvedValue([aQuack(), aQuack()]);
+      const service = new QuacksService(repository);
+
+      await service.searchQuacks(user, 'secret words');
+
+      expect(log).toHaveBeenCalledTimes(1);
+      const message = String(log.mock.calls[0][0]);
+      expect(message).toContain('userId=u1');
+      expect(message).toContain('words=2');
+      expect(message).toContain('results=2');
+      expect(message).not.toContain('secret');
+    });
+  });
+});
+
+describe('parseSearchTerm', () => {
+  it.each([
+    [undefined, []],
+    ['', []],
+    ['   ', []],
+    ['duck', ['duck']],
+    ['  pants   duck ', ['pants', 'duck']],
+    ['@CaffeinatedDuck', ['CaffeinatedDuck']],
+    ['@', []],
+  ])('parses %p into %p', (term, words) => {
+    expect(parseSearchTerm(term)).toEqual(words);
   });
 });
