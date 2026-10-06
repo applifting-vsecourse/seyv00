@@ -46,9 +46,12 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
-type QuackFormProps = { className?: string }
+type QuackFormProps = {
+  className?: string
+  onPosted?: () => void
+}
 
-export function QuackForm({ className }: QuackFormProps) {
+export function QuackForm({ className, onPosted }: QuackFormProps) {
   const addQuack = useAddQuack()
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -59,7 +62,15 @@ export function QuackForm({ className }: QuackFormProps) {
   const length = text?.length ?? 0
 
   const handleSubmit = (values: FormValues) => {
-    addQuack.mutate({ text: values.text, mood: values.mood }, { onSuccess: () => form.reset() })
+    addQuack.mutate(
+      { text: values.text, mood: values.mood },
+      {
+        onSuccess: () => {
+          form.reset()
+          onPosted?.()
+        },
+      },
+    )
   }
 
   return (
