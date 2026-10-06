@@ -26,6 +26,12 @@ Need a control that isn't in `src/components/ui/`? Add it with `pnpm dlx shadcn@
 
 The CLI puts `shadow-xs`/`shadow-sm` on inputs, textareas and cards. [`DESIGN.md`](DESIGN.md) keeps shadows for things that genuinely float — dialogs, dropdowns, toasts. Strip them.
 
+Check `git diff` after the CLI runs. It has been seen adding an unrelated `cn` npm package to `package.json` and making the new component `import { cn } from "cn"`. Remove the package and import `cn` from `@/lib/utils` like every other file in `src/components/ui/` — a kit component needs nothing beyond its Radix primitive.
+
+### Commits contain real changes only
+
+Prettier and the shadcn CLI rewrite line endings on Windows, so files you never edited show up as modified. Don't commit them: compare `git status` with `git diff --ignore-cr-at-eol --stat`, and restore any file that appears only in the first with `git checkout -- <file>`.
+
 ### The app is already running
 
 Assume the dev servers are up. If something is listening on the app's ports, that is this application: use it. Don't start a second instance, don't restart it, don't run `pnpm dev`.
