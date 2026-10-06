@@ -9,6 +9,7 @@ import { QuackList } from "@/features/quack/components/QuackList"
 const quack = (overrides: Partial<Quack> = {}): Quack => ({
   id: "q1",
   text: "quack quack",
+  mood: null,
   userId: "u1",
   createdAt: new Date("2026-01-01T12:00:00Z"),
   user: { id: "u1", name: "Caffeinated Duck", username: "CaffeinatedDuck" },
@@ -22,6 +23,20 @@ describe("QuackList", () => {
     expect(screen.getByText("quack quack")).toBeInTheDocument()
     expect(screen.getByText("Caffeinated Duck")).toBeInTheDocument()
     expect(screen.getByText("@CaffeinatedDuck")).toBeInTheDocument()
+  })
+
+  it("shows the mood of a quack that has one", () => {
+    render(<QuackList quacks={[quack({ mood: "silly" })]} />)
+
+    expect(screen.getByText("Silly")).toBeInTheDocument()
+  })
+
+  it("shows no mood for a quack without one", () => {
+    render(<QuackList quacks={[quack()]} />)
+
+    for (const label of ["Happy", "Sad", "Angry", "Silly"]) {
+      expect(screen.queryByText(label)).not.toBeInTheDocument()
+    }
   })
 
   it("shows an error with a working reload button", async () => {
