@@ -2,6 +2,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { formatDate } from "@/lib/date"
 
 import type { Quack } from "@/features/quack/api/quackSchemas"
+import { QuackMood } from "@/features/quack/components/QuackMood"
 import { UsersName } from "@/features/quack/components/UsersName"
 import { UsersUserName } from "@/features/quack/components/UsersUserName"
 
@@ -30,6 +31,12 @@ export function QuackItem({ quack }: QuackItemProps) {
           </span>
           <span className="text-xs text-muted-foreground">·</span>
           <time className="text-xs text-muted-foreground">{formatDate(quack.createdAt)}</time>
+          {quack.mood ? (
+            <>
+              <span className="text-xs text-muted-foreground">·</span>
+              <QuackMood mood={quack.mood} />
+            </>
+          ) : null}
         </div>
         <p className="text-sm break-words whitespace-pre-line">{quack.text}</p>
       </div>
