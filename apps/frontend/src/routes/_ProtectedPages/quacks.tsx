@@ -5,6 +5,7 @@ import { z } from "zod"
 
 import { Seo } from "@/components/Seo"
 
+import { profileQueryOptions } from "@/features/profile/api/profileQueryOptions"
 import { quacksQueryOptions } from "@/features/quack/api/quacksQueryOptions"
 import { QuackForm } from "@/features/quack/components/QuackForm"
 import { QuackList } from "@/features/quack/components/QuackList"
@@ -22,14 +23,18 @@ const quacksSearchSchema = z.object({
 })
 
 export const Route = createFileRoute("/_ProtectedPages/quacks")({
-  component: QuacksPage,
   validateSearch: quacksSearchSchema,
+  // Loaded up front so the new-quack form starts with the preferred mood.
+  // prefetchQuery never throws: without a profile the form just starts with no mood.
+  loader: ({ context }) => context.queryClient.prefetchQuery(profileQueryOptions()),
+  component: QuacksPage,
 })
 
 function QuacksPage() {
   const { q: search = "" } = Route.useSearch()
   const navigate = Route.useNavigate()
   const quacksQuery = useQuery(quacksQueryOptions(search))
+  const profileQuery = useQuery(profileQueryOptions())
 
   const setSearch = useCallback(
     (next: string) => {
@@ -52,6 +57,7 @@ function QuacksPage() {
         <h1 className="mb-4 text-2xl font-semibold tracking-tight">Quacks</h1>
 
         <QuackForm
+          defaultMood={profileQuery.data?.defaultMood}
           className="mb-6"
           // A new quack may not match the search, so show it in the full feed.
           onPosted={() => setSearch("")}

@@ -3,6 +3,7 @@ import { Loader2 } from "lucide-react"
 import { useForm, useWatch } from "react-hook-form"
 import { z } from "zod"
 
+import { MoodSelect } from "@/components/MoodSelect"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {
@@ -13,27 +14,15 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { moodSchema, type Mood } from "@/lib/moods"
 import { cn } from "@/lib/utils"
 
-import { quackMoods, quackMoodSchema } from "@/features/quack/api/quackSchemas"
-import { QUACK_MOOD_DISPLAY } from "@/features/quack/components/QuackMood"
 import { useAddQuack } from "@/features/quack/hooks/useAddQuack"
 
 // Mirrors the server-side DTO (MaxLength(280)) so the user is told before
 // the request is made — the server still validates independently.
 const MAX_LENGTH = 280
-
-// Radix Select can't hold an empty value, so "no mood" gets its own sentinel
-// in the picker and becomes null in the form state.
-const NO_MOOD = "none"
 
 const schema = z.object({
   text: z
@@ -41,21 +30,23 @@ const schema = z.object({
     .trim()
     .min(1, "Write something first")
     .max(MAX_LENGTH, `Keep it under ${MAX_LENGTH} characters`),
-  mood: quackMoodSchema.nullable(),
+  mood: moodSchema.nullable(),
 })
 
 type FormValues = z.infer<typeof schema>
 
 type QuackFormProps = {
+  // The user's preferred mood from their settings; each new quack starts with it.
+  defaultMood?: Mood | null
   className?: string
   onPosted?: () => void
 }
 
-export function QuackForm({ className, onPosted }: QuackFormProps) {
+export function QuackForm({ defaultMood = null, className, onPosted }: QuackFormProps) {
   const addQuack = useAddQuack()
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { text: "", mood: null },
+    defaultValues: { text: "", mood: defaultMood },
   })
 
   const text = useWatch({ control: form.control, name: "text" })
@@ -66,7 +57,8 @@ export function QuackForm({ className, onPosted }: QuackFormProps) {
       { text: values.text, mood: values.mood },
       {
         onSuccess: () => {
-          form.reset()
+          // back to the preferred mood, not whatever this quack used
+          form.reset({ text: "", mood: defaultMood })
           onPosted?.()
         },
       },
@@ -112,35 +104,13 @@ export function QuackForm({ className, onPosted }: QuackFormProps) {
             render={({ field }) => (
               <FormItem className="sm:w-40">
                 <FormLabel>Mood</FormLabel>
-                <Select
-                  value={field.value ?? NO_MOOD}
-                  onValueChange={(value) =>
-                    field.onChange(value === NO_MOOD ? null : quackMoodSchema.parse(value))
-                  }
-                  disabled={addQuack.isPending}
-                >
-                  <FormControl>
-                    <SelectTrigger
-                      ref={field.ref}
-                      onBlur={field.onBlur}
-                      className="w-full"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value={NO_MOOD}>No mood</SelectItem>
-                    {quackMoods.map((mood) => (
-                      <SelectItem
-                        key={mood}
-                        value={mood}
-                      >
-                        <span aria-hidden="true">{QUACK_MOOD_DISPLAY[mood].emoji}</span>
-                        {QUACK_MOOD_DISPLAY[mood].label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <MoodSelect
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  ref={field.ref}
+                  isDisabled={addQuack.isPending}
+                />
                 <FormMessage />
               </FormItem>
             )}
