@@ -108,6 +108,10 @@ model User {
   username        String? @db.VarChar(50)
   displayUsername String? @db.VarChar(50)
 
+  bio             String?    @db.VarChar(160)
+  // preselected in the new-quack form
+  defaultMood     QuackMood?
+
   @@unique([email])
   @@unique([username])
   @@map("user")
