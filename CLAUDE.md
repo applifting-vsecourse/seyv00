@@ -20,6 +20,12 @@ The worked example is the quack feed: `Quack` model → seed → repository → 
 
 Deliberately sparse — this file grows as the team learns what it expects from generated code. Add rules here when you find yourself repeating the same review feedback.
 
+### New work starts from an up-to-date `main`
+
+Before starting anything new — a story, a fix, a docs change — sync local `main` with GitHub: `git fetch origin`, `git checkout main`, `git merge --ff-only origin/main`. Then branch off that `main`. Other people's PRs land on GitHub while you work, so a local `main` is stale by default; branching off it means building on old code and resolving conflicts later instead of now.
+
+If the fast-forward fails, local `main` has commits GitHub doesn't. Stop and ask — don't merge, rebase or reset it on your own.
+
 ### UI controls come from the kit
 
 Need a control that isn't in `src/components/ui/`? Add it with `pnpm dlx shadcn@latest add <name>` — don't hand-roll one in a feature folder, even where a native input would do the job. One accessibility implementation to reason about beats a per-control judgement call.
