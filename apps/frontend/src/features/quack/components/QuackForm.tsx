@@ -39,9 +39,10 @@ type QuackFormProps = {
   // The user's preferred mood from their settings; each new quack starts with it.
   defaultMood?: Mood | null
   className?: string
+  onPosted?: () => void
 }
 
-export function QuackForm({ defaultMood = null, className }: QuackFormProps) {
+export function QuackForm({ defaultMood = null, className, onPosted }: QuackFormProps) {
   const addQuack = useAddQuack()
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -54,8 +55,13 @@ export function QuackForm({ defaultMood = null, className }: QuackFormProps) {
   const handleSubmit = (values: FormValues) => {
     addQuack.mutate(
       { text: values.text, mood: values.mood },
-      // back to the preferred mood, not whatever this quack used
-      { onSuccess: () => form.reset({ text: "", mood: defaultMood }) },
+      {
+        onSuccess: () => {
+          // back to the preferred mood, not whatever this quack used
+          form.reset({ text: "", mood: defaultMood })
+          onPosted?.()
+        },
+      },
     )
   }
 
