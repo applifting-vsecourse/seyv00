@@ -32,16 +32,52 @@ enum QuackMood {
 }
 
 model Quack {
-  id        String     @id @default(cuid())
-  text      String     @db.Text
-  mood      QuackMood?
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId    String
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @default(now()) @updatedAt
+  id          String       @id @default(cuid())
+  text        String       @db.Text
+  mood        QuackMood?
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @default(now()) @updatedAt
+  // a quack with answers is a poll; the quack text is its question
+  pollOptions PollOption[]
+  pollVotes   PollVote[]
 
   @@index([userId])
   @@map("quack")
+}
+
+model PollOption {
+  id       String     @id @default(cuid())
+  quack    Quack      @relation(fields: [quackId], references: [id], onDelete: Cascade)
+  quackId  String
+  text     String     @db.VarChar(50)
+  // the order the author typed the answers in
+  position Int
+  votes    PollVote[]
+
+  @@unique([quackId, position])
+  // target of PollVote's composite foreign key
+  @@unique([id, quackId])
+  @@map("poll_option")
+}
+
+model PollVote {
+  quack     Quack      @relation(fields: [quackId], references: [id], onDelete: Cascade)
+  quackId   String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  // (optionId, quackId) together: a vote can only point at an answer of its own poll
+  option    PollOption @relation(fields: [optionId, quackId], references: [id, quackId], onDelete: Cascade)
+  optionId  String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @default(now()) @updatedAt
+
+  // one person, one vote per poll — enforced by the database, not just the app
+  @@id([quackId, userId])
+  @@index([optionId])
+  @@index([userId])
+  @@map("poll_vote")
 }
 
 model Session {
@@ -93,24 +129,25 @@ model Verification {
 }
 
 model User {
-  id              String    @id
-  name            String
-  email           String
-  emailVerified   Boolean
-  image           String?   @db.Text
-  createdAt       DateTime
-  updatedAt       DateTime
-  sessions        Session[]
-  accounts        Account[]
-  quacks          Quack[]
-  role            UserRole  @default(user)
+  id            String     @id
+  name          String
+  email         String
+  emailVerified Boolean
+  image         String?    @db.Text
+  createdAt     DateTime
+  updatedAt     DateTime
+  sessions      Session[]
+  accounts      Account[]
+  quacks        Quack[]
+  pollVotes     PollVote[]
+  role          UserRole   @default(user)
 
   username        String? @db.VarChar(50)
   displayUsername String? @db.VarChar(50)
 
-  bio             String?    @db.VarChar(160)
+  bio         String?    @db.VarChar(160)
   // preselected in the new-quack form
-  defaultMood     QuackMood?
+  defaultMood QuackMood?
 
   @@unique([email])
   @@unique([username])

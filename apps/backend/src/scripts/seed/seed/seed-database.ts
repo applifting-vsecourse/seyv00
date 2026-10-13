@@ -164,6 +164,33 @@ Please stop tagging me.`,
 
   const now = Date.now();
 
+  // One poll, so the feature has something to show right after seeding.
+  const lunchPoll = await createQuack(prisma, {
+    text: 'Pond meetup on Saturday. Where do we go for lunch?',
+    userId: breadCritic.id,
+    createdAt: new Date(now - 45 * MINUTE_IN_MS),
+    pollOptions: [
+      'The bakery bin',
+      'Picnic by the reeds',
+      'Wherever the swan is not',
+    ],
+  });
+  const lunchOptions = await prisma.pollOption.findMany({
+    where: { quackId: lunchPoll.id },
+    orderBy: { position: 'asc' },
+  });
+  await prisma.pollVote.createMany({
+    data: [
+      { voter: caffeinatedDuck, option: 0 },
+      { voter: pondAdmin, option: 0 },
+      { voter: migrationSeason, option: 2 },
+    ].map(({ voter, option }) => ({
+      quackId: lunchPoll.id,
+      userId: voter.id,
+      optionId: lunchOptions[option].id,
+    })),
+  });
+
   for (const { author, minutesAgo, text } of exampleQuacks) {
     await createQuack(prisma, {
       text,
