@@ -77,8 +77,10 @@ const escapeLikePattern = (word: string): string =>
 export class QuackRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getQuacks(viewerId: string): Promise<Quack[]> {
+  /** The whole feed, or only `authorId`'s quacks when given. */
+  async getQuacks(viewerId: string, authorId?: string): Promise<Quack[]> {
     const quacks = await this.prisma.quack.findMany({
+      where: { userId: authorId },
       include: quackInclude,
       orderBy: { createdAt: 'desc' },
     });
@@ -89,8 +91,13 @@ export class QuackRepository {
    * Quacks where every word appears in the text, the author's name or their
    * username, ignoring case and accents. Newest first, like getQuacks.
    * Poll answers are deliberately not searched — a poll is found by its question.
+   * Limited to `authorId`'s quacks when given.
    */
-  async searchQuacks(words: string[], viewerId: string): Promise<Quack[]> {
+  async searchQuacks(
+    words: string[],
+    viewerId: string,
+    authorId?: string,
+  ): Promise<Quack[]> {
     // Prisma's query builder has no accent-insensitive match, so the filter is
     // raw SQL and the rows are then loaded the usual way.
     const conditions = words.map((word) => {
@@ -108,7 +115,10 @@ export class QuackRepository {
     `;
 
     const quacks = await this.prisma.quack.findMany({
-      where: { id: { in: matches.map((match) => match.id) } },
+      where: {
+        id: { in: matches.map((match) => match.id) },
+        userId: authorId,
+      },
       include: quackInclude,
       orderBy: { createdAt: 'desc' },
     });
@@ -142,6 +152,27 @@ export class QuackRepository {
       counts: new Map(),
       myVotes: new Map(),
     });
+  }
+
+  /**
+   * Deletes the quack if `userId` wrote it. The service checks the author
+   * first; repeating it here means a race can't delete someone else's quack.
+   * False when nothing matched. Poll answers and votes go with it (onDelete: Cascade).
+   */
+  async deleteOwnQuack(quackId: string, userId: string): Promise<boolean> {
+    const { count } = await this.prisma.quack.deleteMany({
+      where: { id: quackId, userId },
+    });
+    return count > 0;
+  }
+
+  /** Who wrote the quack, or null when there's no such quack. */
+  async getQuackAuthorId(quackId: string): Promise<string | null> {
+    const quack = await this.prisma.quack.findUnique({
+      where: { id: quackId },
+      select: { userId: true },
+    });
+    return quack?.userId ?? null;
   }
 
   /** The poll's answer ids, or null when there's no such quack or it isn't a poll. */

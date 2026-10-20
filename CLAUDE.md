@@ -34,6 +34,10 @@ The CLI puts `shadow-xs`/`shadow-sm` on inputs, textareas and cards. [`DESIGN.md
 
 Check `git diff` after the CLI runs. It has been seen adding an unrelated `cn` npm package to `package.json` and making the new component `import { cn } from "cn"`. Remove the package and import `cn` from `@/lib/utils` like every other file in `src/components/ui/` — a kit component needs nothing beyond its Radix primitive.
 
+### Permission checks live in the service
+
+Every endpoint that changes or deletes data checks in the service that the user from `@User()` may do it, and throws `ForbiddenException` otherwise. Hiding a button in the UI is not a check. The current user always comes from the session, never from the body or the URL.
+
 ### Commits contain real changes only
 
 Prettier and the shadcn CLI rewrite line endings on Windows, so files you never edited show up as modified. Don't commit them: compare `git status` with `git diff --ignore-cr-at-eol --stat`, and restore any file that appears only in the first with `git checkout -- <file>`.
