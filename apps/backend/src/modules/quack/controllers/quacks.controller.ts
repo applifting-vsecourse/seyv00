@@ -1,6 +1,7 @@
 import {
   PollNotFoundError,
   PollOptionNotFoundError,
+  QuackNotFoundError,
 } from '@/modules/quack/domain/quack';
 import { QuacksService } from '@/modules/quack/services/quacks.service';
 import { User } from '@/shared/auth/decorators/user.decorator';
@@ -10,6 +11,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -49,14 +51,20 @@ export class QuacksController {
   constructor(private readonly quacksService: QuacksService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List quacks, optionally filtered by a search' })
+  @ApiOperation({
+    summary: 'List quacks, optionally filtered by a search or to your own',
+  })
   @ApiResponse({ status: 200, type: [QuackResponseDto] })
   @ApiResponse({ status: 401, description: 'Not signed in' })
   async list(
     @User() user: Identity,
     @Query() query: ListQuacksQueryDto,
   ): Promise<QuackResponseDto[]> {
-    const quacks = await this.quacksService.searchQuacks(user, query.q);
+    const quacks = await this.quacksService.searchQuacks(
+      user,
+      query.q,
+      query.mine ?? false,
+    );
     return quacks.map(QuackResponseDto.fromDomain);
   }
 
@@ -76,6 +84,27 @@ export class QuacksController {
       pollOptions: body.poll?.options ?? null,
     });
     return QuackResponseDto.fromDomain(quack);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete one of your own quacks' })
+  @ApiResponse({ status: 204, description: 'Deleted' })
+  @ApiResponse({ status: 401, description: 'Not signed in' })
+  @ApiResponse({ status: 403, description: 'Someone else wrote this quack' })
+  @ApiResponse({ status: 404, description: 'No such quack' })
+  async delete(
+    @User() user: Identity,
+    @Param('id') quackId: string,
+  ): Promise<void> {
+    try {
+      await this.quacksService.deleteQuack(user, quackId);
+    } catch (error) {
+      if (error instanceof QuackNotFoundError) {
+        throw new NotFoundException(error.message);
+      }
+      throw error;
+    }
   }
 
   @Put(':id/vote')
