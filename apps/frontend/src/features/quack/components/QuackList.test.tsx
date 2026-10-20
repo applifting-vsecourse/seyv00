@@ -1,6 +1,5 @@
 // Example component test — the pattern to copy for your own components.
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { render, screen, within } from "@testing-library/react"
+import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
 
@@ -62,65 +61,6 @@ describe("QuackList", () => {
     render(<QuackList quacks={[]} />)
 
     expect(screen.getByText("No quacks yet. Post the first one.")).toBeInTheDocument()
-  })
-
-  it("offers delete on the signed-in user's quacks only", () => {
-    render(
-      <QueryClientProvider client={new QueryClient()}>
-        <QuackList
-          currentUserId="u1"
-          quacks={[
-            quack(),
-            quack({
-              id: "q2",
-              text: "not mine",
-              userId: "u2",
-              user: { id: "u2", name: "Bread Critic", username: "BreadCritic" },
-            }),
-          ]}
-        />
-      </QueryClientProvider>,
-    )
-
-    const [mine, theirs] = screen.getAllByRole("article") as [HTMLElement, HTMLElement]
-    expect(within(mine).getByRole("button", { name: "Delete quack" })).toBeInTheDocument()
-    expect(within(theirs).queryByRole("button", { name: "Delete quack" })).not.toBeInTheDocument()
-  })
-
-  it("offers no delete without a signed-in user", () => {
-    render(<QuackList quacks={[quack()]} />)
-
-    expect(screen.queryByRole("button", { name: "Delete quack" })).not.toBeInTheDocument()
-  })
-
-  it("says when I have no quacks yet and offers to write the first", async () => {
-    const onWriteFirst = vi.fn()
-    render(
-      <QuackList
-        quacks={[]}
-        isMine
-        onWriteFirst={onWriteFirst}
-      />,
-    )
-
-    expect(screen.getByText("You haven't posted any quacks yet.")).toBeInTheDocument()
-    expect(screen.queryByText("No quacks yet. Post the first one.")).not.toBeInTheDocument()
-
-    await userEvent.click(screen.getByRole("button", { name: "Write your first quack" }))
-    expect(onWriteFirst).toHaveBeenCalledOnce()
-  })
-
-  it("says nothing matches a search in my quacks too", () => {
-    render(
-      <QuackList
-        quacks={[]}
-        isMine
-        search="zluva"
-      />,
-    )
-
-    expect(screen.getByText("No quacks match “zluva”.")).toBeInTheDocument()
-    expect(screen.queryByText("You haven't posted any quacks yet.")).not.toBeInTheDocument()
   })
 
   it("shows an error with a working reload button", async () => {

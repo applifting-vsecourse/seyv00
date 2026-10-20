@@ -14,11 +14,6 @@ type QuackListProps = {
   // The applied search, if any; it changes what the empty state says.
   search?: string
   onClearSearch?: () => void
-  // The signed-in user; their own quacks get a delete action.
-  currentUserId?: string
-  // Showing only the signed-in user's quacks; it changes what the empty state says.
-  isMine?: boolean
-  onWriteFirst?: () => void
 }
 
 export function QuackList({
@@ -28,9 +23,6 @@ export function QuackList({
   onReload,
   search,
   onClearSearch,
-  currentUserId,
-  isMine,
-  onWriteFirst,
 }: QuackListProps) {
   const isEmpty = !isLoading && !error && quacks.length === 0
 
@@ -81,24 +73,7 @@ export function QuackList({
         </div>
       ) : null}
 
-      {isEmpty && !search && isMine ? (
-        <div className="flex flex-col items-center gap-3 py-8">
-          <p className="text-center text-sm text-muted-foreground">
-            You haven&apos;t posted any quacks yet.
-          </p>
-          {onWriteFirst ? (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onWriteFirst}
-            >
-              Write your first quack
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
-
-      {isEmpty && !search && !isMine ? (
+      {isEmpty && !search ? (
         <p className="py-8 text-center text-sm text-muted-foreground">
           No quacks yet. Post the first one.
         </p>
@@ -108,7 +83,6 @@ export function QuackList({
         <QuackItem
           key={quack.id}
           quack={quack}
-          canDelete={currentUserId !== undefined && quack.userId === currentUserId}
         />
       ))}
     </div>

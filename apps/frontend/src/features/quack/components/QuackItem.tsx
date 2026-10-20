@@ -2,19 +2,14 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { formatDate } from "@/lib/date"
 
 import type { Quack } from "@/features/quack/api/quackSchemas"
-import { QuackDeleteButton } from "@/features/quack/components/QuackDeleteButton"
 import { QuackMood } from "@/features/quack/components/QuackMood"
 import { QuackPoll } from "@/features/quack/components/QuackPoll"
 import { UsersName } from "@/features/quack/components/UsersName"
 import { UsersUserName } from "@/features/quack/components/UsersUserName"
 
-type QuackItemProps = {
-  quack: Quack
-  // Only the author gets the delete action; the server enforces it regardless.
-  canDelete?: boolean
-}
+type QuackItemProps = { quack: Quack }
 
-export function QuackItem({ quack, canDelete = false }: QuackItemProps) {
+export function QuackItem({ quack }: QuackItemProps) {
   const { name, username } = quack.user
 
   const initials = name
@@ -42,11 +37,6 @@ export function QuackItem({ quack, canDelete = false }: QuackItemProps) {
               <span className="text-xs text-muted-foreground">·</span>
               <QuackMood mood={quack.mood} />
             </>
-          ) : null}
-          {canDelete ? (
-            <div className="ml-auto self-center">
-              <QuackDeleteButton quackId={quack.id} />
-            </div>
           ) : null}
         </div>
         <p className="text-sm break-words whitespace-pre-line">{quack.text}</p>

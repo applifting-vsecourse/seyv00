@@ -5,11 +5,10 @@ import {
   PollNotFoundError,
   PollOptionNotFoundError,
   Quack,
-  QuackNotFoundError,
 } from '@/modules/quack/domain/quack';
 import { QuackRepository } from '@/modules/quack/repositories/quack.repository';
 import { Identity } from '@/shared/auth/domain/identity';
-import { ForbiddenException, Logger } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { mock } from 'jest-mock-extended';
 import { parseSearchTerm, QuacksService } from './quacks.service';
 
@@ -190,42 +189,6 @@ describe('QuacksService', () => {
     });
   });
 
-  describe('deleteQuack', () => {
-    const user = { id: 'u1' } as Identity;
-
-    it('deletes a quack as the signed-in user', async () => {
-      const repository = mock<QuackRepository>();
-      repository.deleteOwnQuack.mockResolvedValue(true);
-      const service = new QuacksService(repository);
-
-      await expect(service.deleteQuack(user, 'q1')).resolves.toBeUndefined();
-      // the author check uses the session, never the request
-      expect(repository.deleteOwnQuack).toHaveBeenCalledWith('q1', 'u1');
-    });
-
-    it("refuses someone else's quack", async () => {
-      const repository = mock<QuackRepository>();
-      repository.deleteOwnQuack.mockResolvedValue(false);
-      repository.quackExists.mockResolvedValue(true);
-      const service = new QuacksService(repository);
-
-      await expect(service.deleteQuack(user, 'q1')).rejects.toBeInstanceOf(
-        ForbiddenException,
-      );
-    });
-
-    it('reports a quack that does not exist', async () => {
-      const repository = mock<QuackRepository>();
-      repository.deleteOwnQuack.mockResolvedValue(false);
-      repository.quackExists.mockResolvedValue(false);
-      const service = new QuacksService(repository);
-
-      await expect(service.deleteQuack(user, 'gone')).rejects.toBeInstanceOf(
-        QuackNotFoundError,
-      );
-    });
-  });
-
   describe('searchQuacks', () => {
     const user = { id: 'u1' } as Identity;
 
@@ -260,44 +223,7 @@ describe('QuacksService', () => {
       expect(repository.searchQuacks).toHaveBeenCalledWith(
         ['pants', 'CaffeinatedDuck'],
         'u1',
-        undefined,
       );
-    });
-
-    it('limits the feed to the signed-in user for "mine"', async () => {
-      const quacks = [aQuack()];
-      const repository = mock<QuackRepository>();
-      repository.getQuacks.mockResolvedValue(quacks);
-      const service = new QuacksService(repository);
-
-      await expect(service.searchQuacks(user, '', true)).resolves.toEqual(
-        quacks,
-      );
-      expect(repository.getQuacks).toHaveBeenCalledWith('u1', 'u1');
-    });
-
-    it('limits a search to the signed-in user for "mine"', async () => {
-      const repository = mock<QuackRepository>();
-      repository.searchQuacks.mockResolvedValue([]);
-      const service = new QuacksService(repository);
-
-      await service.searchQuacks(user, 'duck', true);
-
-      expect(repository.searchQuacks).toHaveBeenCalledWith(
-        ['duck'],
-        'u1',
-        'u1',
-      );
-    });
-
-    it('does not limit the feed by author otherwise', async () => {
-      const repository = mock<QuackRepository>();
-      repository.getQuacks.mockResolvedValue([]);
-      const service = new QuacksService(repository);
-
-      await service.searchQuacks(user, undefined);
-
-      expect(repository.getQuacks).toHaveBeenCalledWith('u1', undefined);
     });
 
     it('logs usage without the search text', async () => {

@@ -19,10 +19,7 @@ export function useSignIn() {
       if (error) throw new Error(error.message ?? "Sign in failed")
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: authKeys.session(),
-        refetchType: "all",
-      })
+      await queryClient.invalidateQueries({ queryKey: authKeys.session() })
     },
   })
 }

@@ -40,12 +40,6 @@ export type Quack = {
 // What the vote upsert did, for the usage log.
 export type VoteOutcome = 'first' | 'change' | 'same';
 
-export class QuackNotFoundError extends Error {
-  constructor() {
-    super('Quack not found');
-  }
-}
-
 export class PollNotFoundError extends Error {
   constructor() {
     super('Poll not found');
