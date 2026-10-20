@@ -4,10 +4,11 @@ import {
   PollOptionNotFoundError,
   Quack,
   QuackMood,
+  QuackNotFoundError,
 } from '@/modules/quack/domain/quack';
 import { QuackRepository } from '@/modules/quack/repositories/quack.repository';
 import { Identity } from '@/shared/auth/domain/identity';
-import { Injectable, Logger } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 
 /**
  * Splits a search box value into the words a quack must all contain.
@@ -33,13 +34,20 @@ export class QuacksService {
   async searchQuacks(
     user: Identity,
     term: string | undefined,
+    onlyMine = false,
   ): Promise<Quack[]> {
+    // "mine" always means the signed-in user, never an id from the request
+    const authorId = onlyMine ? user.id : undefined;
     const words = parseSearchTerm(term);
     if (words.length === 0) {
-      return this.quackRepository.getQuacks(user.id);
+      return this.quackRepository.getQuacks(user.id, authorId);
     }
 
-    const quacks = await this.quackRepository.searchQuacks(words, user.id);
+    const quacks = await this.quackRepository.searchQuacks(
+      words,
+      user.id,
+      authorId,
+    );
     // One line per search so we can see whether people use it. The search
     // text itself is deliberately left out — it's personal.
     this.logger.log(
@@ -70,6 +78,15 @@ export class QuacksService {
       );
     }
     return quack;
+  }
+
+  async deleteQuack(user: Identity, quackId: string): Promise<void> {
+    if (await this.quackRepository.deleteOwnQuack(quackId, user.id)) return;
+    // Nothing deleted: tell "no such quack" apart from "someone else's".
+    if (await this.quackRepository.quackExists(quackId)) {
+      throw new ForbiddenException('Only the author can delete this quack');
+    }
+    throw new QuackNotFoundError();
   }
 
   async vote(user: Identity, quackId: string, optionId: string): Promise<Poll> {
