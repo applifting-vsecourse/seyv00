@@ -195,6 +195,7 @@ describe('QuacksService', () => {
 
     it('deletes a quack as the signed-in user', async () => {
       const repository = mock<QuackRepository>();
+      repository.getQuackAuthorId.mockResolvedValue('u1');
       repository.deleteOwnQuack.mockResolvedValue(true);
       const service = new QuacksService(repository);
 
@@ -203,24 +204,35 @@ describe('QuacksService', () => {
       expect(repository.deleteOwnQuack).toHaveBeenCalledWith('q1', 'u1');
     });
 
-    it("refuses someone else's quack", async () => {
+    it("refuses someone else's quack without deleting it", async () => {
       const repository = mock<QuackRepository>();
-      repository.deleteOwnQuack.mockResolvedValue(false);
-      repository.quackExists.mockResolvedValue(true);
+      repository.getQuackAuthorId.mockResolvedValue('u2');
       const service = new QuacksService(repository);
 
       await expect(service.deleteQuack(user, 'q1')).rejects.toBeInstanceOf(
         ForbiddenException,
       );
+      expect(repository.deleteOwnQuack).not.toHaveBeenCalled();
     });
 
     it('reports a quack that does not exist', async () => {
       const repository = mock<QuackRepository>();
-      repository.deleteOwnQuack.mockResolvedValue(false);
-      repository.quackExists.mockResolvedValue(false);
+      repository.getQuackAuthorId.mockResolvedValue(null);
       const service = new QuacksService(repository);
 
       await expect(service.deleteQuack(user, 'gone')).rejects.toBeInstanceOf(
+        QuackNotFoundError,
+      );
+      expect(repository.deleteOwnQuack).not.toHaveBeenCalled();
+    });
+
+    it('reports a quack deleted between the check and the delete', async () => {
+      const repository = mock<QuackRepository>();
+      repository.getQuackAuthorId.mockResolvedValue('u1');
+      repository.deleteOwnQuack.mockResolvedValue(false);
+      const service = new QuacksService(repository);
+
+      await expect(service.deleteQuack(user, 'q1')).rejects.toBeInstanceOf(
         QuackNotFoundError,
       );
     });
