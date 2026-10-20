@@ -155,9 +155,9 @@ export class QuackRepository {
   }
 
   /**
-   * Deletes the quack only if `userId` wrote it — the author check is part of
-   * the delete statement, so it can't be raced. False when nothing matched.
-   * Poll answers and votes go with it (onDelete: Cascade).
+   * Deletes the quack if `userId` wrote it. The service checks the author
+   * first; repeating it here means a race can't delete someone else's quack.
+   * False when nothing matched. Poll answers and votes go with it (onDelete: Cascade).
    */
   async deleteOwnQuack(quackId: string, userId: string): Promise<boolean> {
     const { count } = await this.prisma.quack.deleteMany({
@@ -166,13 +166,13 @@ export class QuackRepository {
     return count > 0;
   }
 
-  /** Whether a quack with this id exists, whoever wrote it. */
-  async quackExists(quackId: string): Promise<boolean> {
+  /** Who wrote the quack, or null when there's no such quack. */
+  async getQuackAuthorId(quackId: string): Promise<string | null> {
     const quack = await this.prisma.quack.findUnique({
       where: { id: quackId },
-      select: { id: true },
+      select: { userId: true },
     });
-    return quack !== null;
+    return quack?.userId ?? null;
   }
 
   /** The poll's answer ids, or null when there's no such quack or it isn't a poll. */
