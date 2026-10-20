@@ -1,3 +1,4 @@
+import { useImperativeHandle, type Ref } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Loader2, Plus, X } from "lucide-react"
 import { useFieldArray, useForm, useWatch } from "react-hook-form"
@@ -74,19 +75,26 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
+export type QuackFormHandle = {
+  // Puts the cursor in the quack text, e.g. from an empty feed's "write one" button.
+  focus: () => void
+}
+
 type QuackFormProps = {
   // The user's preferred mood from their settings; each new quack starts with it.
   defaultMood?: Mood | null
   className?: string
   onPosted?: () => void
+  ref?: Ref<QuackFormHandle>
 }
 
-export function QuackForm({ defaultMood = null, className, onPosted }: QuackFormProps) {
+export function QuackForm({ defaultMood = null, className, onPosted, ref }: QuackFormProps) {
   const addQuack = useAddQuack()
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { text: "", mood: defaultMood, pollOptions: [] },
   })
+  useImperativeHandle(ref, () => ({ focus: () => form.setFocus("text") }), [form])
   const pollOptions = useFieldArray({ control: form.control, name: "pollOptions" })
   const isPoll = pollOptions.fields.length > 0
 
