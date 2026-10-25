@@ -22,7 +22,11 @@ test("author can post a quack and delete it", async ({ page }) => {
   await expect(quack).toBeVisible()
 
   await quack.getByRole("button", { name: "Delete quack" }).click()
-  await page.getByRole("alertdialog").getByRole("button", { name: "Delete" }).click()
+  const dialog = page.getByRole("alertdialog")
+  await dialog.getByRole("button", { name: "Delete" }).click()
+  // An open dialog hides the feed from getByRole, so a refused delete would
+  // pass the count check below; the dialog closes only on success.
+  await expect(dialog).toBeHidden()
   await expect(quack).toHaveCount(0)
 })
 
@@ -31,6 +35,8 @@ test("nobody can delete someone else's quack", async ({ page }) => {
   await page.goto("/quacks")
 
   const othersQuack = page.getByRole("article").filter({ hasNotText: "@DeepDuckThoughts" }).first()
+  // Wait for the feed; before it loads there's no button to find either.
+  await expect(othersQuack).toBeVisible()
   await expect(othersQuack.getByRole("button", { name: "Delete quack" })).toHaveCount(0)
 
   // The button is hidden. Now skip the UI and ask the server directly.
