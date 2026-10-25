@@ -38,6 +38,12 @@ Check `git diff` after the CLI runs. It has been seen adding an unrelated `cn` n
 
 Every endpoint that changes or deletes data checks in the service that the user from `@User()` may do it, and throws `ForbiddenException` otherwise. Hiding a button in the UI is not a check. The current user always comes from the session, never from the body or the URL.
 
+### An E2E test must be able to fail
+
+Before asserting that something is absent, wait for something present: the dialog closing, the feed showing its first quack. An open dialog hides the rest of the page from `getByRole`, and a feed that hasn't loaded has no quacks either, so `toHaveCount(0)` passes right away even when the delete was refused.
+
+Prove it by switching the server check off. Don't move on until a direct API call confirms that the backend is running the broken code (watch mode takes a while to reload). Then the test has to fail; restore the check afterwards.
+
 ### Commits contain real changes only
 
 Prettier and the shadcn CLI rewrite line endings on Windows, so files you never edited show up as modified. Don't commit them: compare `git status` with `git diff --ignore-cr-at-eol --stat`, and restore any file that appears only in the first with `git checkout -- <file>`.

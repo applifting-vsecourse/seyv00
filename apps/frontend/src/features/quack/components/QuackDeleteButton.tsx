@@ -17,10 +17,14 @@ import { Button } from "@/components/ui/button"
 
 import { useDeleteQuack } from "@/features/quack/hooks/useDeleteQuack"
 
-type QuackDeleteButtonProps = { quackId: string }
+type QuackDeleteButtonProps = {
+  quackId: string
+  // Set when a moderator deletes someone else's quack.
+  authorUsername?: string
+}
 
 // Asks first; on success the quack leaves the feed and this unmounts with it.
-export function QuackDeleteButton({ quackId }: QuackDeleteButtonProps) {
+export function QuackDeleteButton({ quackId, authorUsername }: QuackDeleteButtonProps) {
   const [isOpen, setIsOpen] = useState(false)
   const deleteQuack = useDeleteQuack()
 
@@ -48,10 +52,12 @@ export function QuackDeleteButton({ quackId }: QuackDeleteButtonProps) {
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete this quack?</AlertDialogTitle>
+          <AlertDialogTitle>
+            {authorUsername ? `Delete @${authorUsername}'s quack?` : "Delete this quack?"}
+          </AlertDialogTitle>
           <AlertDialogDescription>
-            It disappears from the feed for everyone, together with any poll votes. This can&apos;t
-            be undone.
+            {authorUsername ? "You're removing it as a moderator. " : null}It disappears from the
+            feed for everyone, together with any poll votes. This can&apos;t be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
 

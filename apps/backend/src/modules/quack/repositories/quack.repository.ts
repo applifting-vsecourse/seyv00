@@ -155,13 +155,14 @@ export class QuackRepository {
   }
 
   /**
-   * Deletes the quack if `userId` wrote it. The service checks the author
-   * first; repeating it here means a race can't delete someone else's quack.
+   * Deletes the quack if `authorId` wrote it. The service checks who may
+   * delete against that author first; repeating the author here means the
+   * delete only hits the quack that check was about.
    * False when nothing matched. Poll answers and votes go with it (onDelete: Cascade).
    */
-  async deleteOwnQuack(quackId: string, userId: string): Promise<boolean> {
+  async deleteQuack(quackId: string, authorId: string): Promise<boolean> {
     const { count } = await this.prisma.quack.deleteMany({
-      where: { id: quackId, userId },
+      where: { id: quackId, userId: authorId },
     });
     return count > 0;
   }
