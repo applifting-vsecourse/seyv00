@@ -83,16 +83,23 @@ export class QuacksService {
   async deleteQuack(user: Identity, quackId: string): Promise<void> {
     const authorId = await this.quackRepository.getQuackAuthorId(quackId);
     if (authorId === null) throw new QuackNotFoundError();
-    // only the author may delete; the user comes from the session
-    if (authorId !== user.id) {
-      throw new ForbiddenException('Only the author can delete this quack');
+    // the author or a moderator may delete; both come from the session
+    const isOwner = authorId === user.id;
+    const isAdmin = user.role === 'admin';
+    if (!isOwner && !isAdmin) {
+      throw new ForbiddenException(
+        'Only the author or a moderator can delete this quack',
+      );
     }
-    const isDeleted = await this.quackRepository.deleteOwnQuack(
-      quackId,
-      user.id,
-    );
+    const isDeleted = await this.quackRepository.deleteQuack(quackId, authorId);
     // gone in the meantime, e.g. deleted from another tab
     if (!isDeleted) throw new QuackNotFoundError();
+    if (!isOwner) {
+      // Who removed whose quack; the text is deliberately left out.
+      this.logger.log(
+        `quack moderated adminId=${user.id} quackId=${quackId} authorId=${authorId}`,
+      );
+    }
   }
 
   async vote(user: Identity, quackId: string, optionId: string): Promise<Poll> {

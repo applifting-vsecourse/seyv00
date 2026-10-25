@@ -87,6 +87,30 @@ describe("QuackList", () => {
     expect(within(theirs).queryByRole("button", { name: "Delete quack" })).not.toBeInTheDocument()
   })
 
+  it("offers a moderator delete on everyone's quacks", () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <QuackList
+          currentUserId="u1"
+          canModerate
+          quacks={[
+            quack(),
+            quack({
+              id: "q2",
+              text: "not mine",
+              userId: "u2",
+              user: { id: "u2", name: "Bread Critic", username: "BreadCritic" },
+            }),
+          ]}
+        />
+      </QueryClientProvider>,
+    )
+
+    const [mine, theirs] = screen.getAllByRole("article") as [HTMLElement, HTMLElement]
+    expect(within(mine).getByRole("button", { name: "Delete quack" })).toBeInTheDocument()
+    expect(within(theirs).getByRole("button", { name: "Delete quack" })).toBeInTheDocument()
+  })
+
   it("offers no delete without a signed-in user", () => {
     render(<QuackList quacks={[quack()]} />)
 

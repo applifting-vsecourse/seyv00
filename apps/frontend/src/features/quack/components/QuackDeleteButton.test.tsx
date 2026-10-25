@@ -63,6 +63,45 @@ describe("QuackDeleteButton", () => {
     expect(screen.getByText("quack quack")).toBeInTheDocument()
   })
 
+  it("tells a moderator whose quack they are deleting", async () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <QuackList
+          quacks={[
+            aQuack({
+              userId: "u2",
+              user: { id: "u2", name: "Bread Critic", username: "BreadCritic" },
+            }),
+          ]}
+          currentUserId="u1"
+          canModerate
+        />
+      </QueryClientProvider>,
+    )
+
+    await userEvent.click(screen.getByRole("button", { name: "Delete quack" }))
+    expect(
+      screen.getByRole("alertdialog", { name: "Delete @BreadCritic's quack?" }),
+    ).toHaveTextContent("You're removing it as a moderator.")
+  })
+
+  it("keeps the usual dialog for a moderator's own quack", async () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <QuackList
+          quacks={[aQuack()]}
+          currentUserId="u1"
+          canModerate
+        />
+      </QueryClientProvider>,
+    )
+
+    await userEvent.click(screen.getByRole("button", { name: "Delete quack" }))
+    expect(screen.getByRole("alertdialog", { name: "Delete this quack?" })).not.toHaveTextContent(
+      "moderator",
+    )
+  })
+
   it("removes the quack from the feed once confirmed", async () => {
     vi.mocked(deleteQuack).mockResolvedValue()
     renderFeed([aQuack(), aQuack({ id: "q2", text: "keep me" })])

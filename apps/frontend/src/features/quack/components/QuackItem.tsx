@@ -10,11 +10,13 @@ import { UsersUserName } from "@/features/quack/components/UsersUserName"
 
 type QuackItemProps = {
   quack: Quack
-  // Only the author gets the delete action; the server enforces it regardless.
+  // The author and moderators get the delete action; the server enforces it regardless.
   canDelete?: boolean
+  // A moderator deleting someone else's quack; the dialog says whose it is.
+  isModerating?: boolean
 }
 
-export function QuackItem({ quack, canDelete = false }: QuackItemProps) {
+export function QuackItem({ quack, canDelete = false, isModerating = false }: QuackItemProps) {
   const { name, username } = quack.user
 
   const initials = name
@@ -45,7 +47,10 @@ export function QuackItem({ quack, canDelete = false }: QuackItemProps) {
           ) : null}
           {canDelete ? (
             <div className="ml-auto self-center">
-              <QuackDeleteButton quackId={quack.id} />
+              <QuackDeleteButton
+                quackId={quack.id}
+                authorUsername={isModerating ? username : undefined}
+              />
             </div>
           ) : null}
         </div>

@@ -111,6 +111,7 @@ function QuacksPage() {
               search={search}
               onClearSearch={() => setSearch("")}
               currentUserId={user?.id}
+              canModerate={user?.role === "admin"}
               isMine={isMine}
               onWriteFirst={() => formRef.current?.focus()}
             />
