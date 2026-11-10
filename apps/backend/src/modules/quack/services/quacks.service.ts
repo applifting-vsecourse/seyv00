@@ -5,6 +5,7 @@ import {
   Quack,
   QuackMood,
   QuackNotFoundError,
+  ReplyToReplyError,
 } from '@/modules/quack/domain/quack';
 import { QuackRepository } from '@/modules/quack/repositories/quack.repository';
 import { Identity } from '@/shared/auth/domain/identity';
@@ -80,9 +81,39 @@ export class QuacksService {
     return quack;
   }
 
+  async getThread(user: Identity, quackId: string): Promise<Quack> {
+    const thread = await this.quackRepository.getThread(quackId, user.id);
+    if (!thread) throw new QuackNotFoundError();
+    return thread;
+  }
+
+  async createReply(
+    user: Identity,
+    parentId: string,
+    replyData: { text: string; mood: QuackMood | null },
+  ): Promise<Quack> {
+    const target = await this.quackRepository.getReplyTarget(parentId);
+    // a deleted quack that still has replies can be replied to; one that is gone can't
+    if (!target) throw new QuackNotFoundError();
+    // one level deep: the UI sends a reply to a reply to its parent instead
+    if (target.parentId !== null) throw new ReplyToReplyError();
+
+    const reply = await this.quackRepository.createReply({
+      parentId,
+      text: replyData.text,
+      mood: replyData.mood,
+      // the author is taken from the session, never from the request body
+      userId: user.id,
+    });
+    // the thread disappeared between the check and the insert
+    if (!reply) throw new QuackNotFoundError();
+    return reply;
+  }
+
   async deleteQuack(user: Identity, quackId: string): Promise<void> {
-    const authorId = await this.quackRepository.getQuackAuthorId(quackId);
-    if (authorId === null) throw new QuackNotFoundError();
+    const target = await this.quackRepository.getDeleteTarget(quackId);
+    if (target === null) throw new QuackNotFoundError();
+    const { authorId, parentId } = target;
     // the author or a moderator may delete; both come from the session
     const isOwner = authorId === user.id;
     const isAdmin = user.role === 'admin';
@@ -91,9 +122,15 @@ export class QuacksService {
         'Only the author or a moderator can delete this quack',
       );
     }
-    const isDeleted = await this.quackRepository.deleteQuack(quackId, authorId);
+    // the repository decides between deleting and leaving a placeholder,
+    // depending on whether the quack has replies at that very moment
+    const outcome = await this.quackRepository.deleteQuack(
+      quackId,
+      authorId,
+      parentId,
+    );
     // gone in the meantime, e.g. deleted from another tab
-    if (!isDeleted) throw new QuackNotFoundError();
+    if (outcome === null) throw new QuackNotFoundError();
     if (!isOwner) {
       // Who removed whose quack; the text is deliberately left out.
       this.logger.log(

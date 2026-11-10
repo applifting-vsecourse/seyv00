@@ -3,6 +3,8 @@ import { act, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
+import { aQuack } from "@/test/quacks"
+
 import { quackKeys } from "@/features/quack/api/quackKeys"
 import type { Poll, Quack } from "@/features/quack/api/quackSchemas"
 import { votePoll } from "@/features/quack/api/votePoll"
@@ -23,15 +25,13 @@ const aPoll = (overrides: Partial<Poll> = {}): Poll => ({
   ...overrides,
 })
 
-const aQuack = (poll: Poll): Quack => ({
-  id: "q1",
-  text: "Lunch?",
-  mood: null,
-  userId: "author",
-  createdAt: new Date("2026-01-01T12:00:00Z"),
-  user: { id: "author", name: "Bread Critic", username: "BreadCritic" },
-  poll,
-})
+const aPollQuack = (poll: Poll): Quack =>
+  aQuack({
+    text: "Lunch?",
+    userId: "author",
+    user: { id: "author", name: "Bread Critic", username: "BreadCritic" },
+    poll,
+  })
 
 // Renders the poll from the feed cache, as QuackList does, so a successful
 // vote's server response shows up the same way it does in the app.
@@ -42,7 +42,8 @@ function FeedPoll() {
     enabled: false,
   })
   const quack = data?.[0]
-  return quack?.poll ? (
+  // a deleted quack has no poll
+  return quack && !quack.isDeleted && quack.poll ? (
     <QuackPoll
       quackId={quack.id}
       poll={quack.poll}
@@ -52,7 +53,7 @@ function FeedPoll() {
 
 const renderPoll = (poll: Poll) => {
   const queryClient = new QueryClient()
-  queryClient.setQueryData<Quack[]>(quackKeys.list(""), [aQuack(poll)])
+  queryClient.setQueryData<Quack[]>(quackKeys.list(""), [aPollQuack(poll)])
   render(
     <QueryClientProvider client={queryClient}>
       <FeedPoll />

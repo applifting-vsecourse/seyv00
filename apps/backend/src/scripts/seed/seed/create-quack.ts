@@ -8,18 +8,21 @@ type CreateQuackParams = {
   // quack shares one timestamp and the feed reads like a single burst.
   createdAt?: Date;
   pollOptions?: string[];
+  // makes it a reply to that quack
+  parentId?: string;
 };
 
 export async function createQuack(
   prisma: PrismaService,
   params: CreateQuackParams,
 ): Promise<Quack> {
-  const { text, userId, createdAt, pollOptions } = params;
+  const { text, userId, createdAt, pollOptions, parentId } = params;
 
   return await prisma.quack.create({
     data: {
       text,
       createdAt,
+      parent: parentId ? { connect: { id: parentId } } : undefined,
       pollOptions: pollOptions
         ? {
             create: pollOptions.map((optionText, position) => ({

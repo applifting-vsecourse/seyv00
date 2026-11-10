@@ -16,6 +16,8 @@ The worked example is the quack feed: `Quack` model → seed → repository → 
 - `pnpm backend test` / `pnpm frontend test:ci` — unit tests
 - `pnpm backend prisma:migrations:run` — create/apply migrations after schema changes
 
+**Before changing the data model or the app's structure, check the ADR index [`docs/adr/README.md`](docs/adr/README.md).**
+
 ## Conventions
 
 Deliberately sparse — this file grows as the team learns what it expects from generated code. Add rules here when you find yourself repeating the same review feedback.

@@ -2,6 +2,7 @@ import {
   PollNotFoundError,
   PollOptionNotFoundError,
   QuackNotFoundError,
+  ReplyToReplyError,
 } from '@/modules/quack/domain/quack';
 import { QuacksService } from '@/modules/quack/services/quacks.service';
 import { User } from '@/shared/auth/decorators/user.decorator';
@@ -31,6 +32,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { CreateQuackDto } from './dto/create-quack.dto';
+import { CreateReplyDto } from './dto/create-reply.dto';
 import { ListQuacksQueryDto } from './dto/list-quacks.query.dto';
 import { PollResponseDto } from './dto/poll.response.dto';
 import { QuackResponseDto } from './dto/quack.response.dto';
@@ -84,6 +86,63 @@ export class QuacksController {
       pollOptions: body.poll?.options ?? null,
     });
     return QuackResponseDto.fromDomain(quack);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'A thread: the quack and all its replies' })
+  @ApiResponse({ status: 200, type: QuackResponseDto })
+  @ApiResponse({ status: 401, description: 'Not signed in' })
+  @ApiResponse({
+    status: 404,
+    description: 'No such thread (a reply id, or a thread that is gone)',
+  })
+  async thread(
+    @User() user: Identity,
+    @Param('id') quackId: string,
+  ): Promise<QuackResponseDto> {
+    try {
+      const thread = await this.quacksService.getThread(user, quackId);
+      return QuackResponseDto.fromDomain(thread);
+    } catch (error) {
+      if (error instanceof QuackNotFoundError) {
+        throw new NotFoundException(error.message);
+      }
+      throw error;
+    }
+  }
+
+  @Post(':id/replies')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Reply to a quack, including one whose author deleted it',
+  })
+  @ApiResponse({ status: 201, type: QuackResponseDto })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid reply, a poll in it, or the quack is itself a reply',
+  })
+  @ApiResponse({ status: 401, description: 'Not signed in' })
+  @ApiResponse({ status: 404, description: 'No such quack' })
+  async reply(
+    @User() user: Identity,
+    @Param('id') quackId: string,
+    @Body() body: CreateReplyDto,
+  ): Promise<QuackResponseDto> {
+    try {
+      const reply = await this.quacksService.createReply(user, quackId, {
+        text: body.text,
+        mood: body.mood ?? null,
+      });
+      return QuackResponseDto.fromDomain(reply);
+    } catch (error) {
+      if (error instanceof QuackNotFoundError) {
+        throw new NotFoundException(error.message);
+      }
+      if (error instanceof ReplyToReplyError) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
   }
 
   @Delete(':id')

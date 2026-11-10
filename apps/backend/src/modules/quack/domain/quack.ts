@@ -26,16 +26,40 @@ export type Poll = {
   isAuthor: boolean;
 };
 
+// How many replies the feed shows under a quack before "Show more replies".
+export const REPLY_PREVIEW_COUNT = 3;
+
+// What a reply answers, for the "↳ reply to @username" header.
+export type ReplyParent = {
+  id: string;
+  isDeleted: boolean;
+  // null when the parent was deleted
+  username: string | null;
+};
+
+// A deleted quack that still has replies stays as a placeholder so its thread
+// holds together: isDeleted is true and text, mood, author and poll are gone.
 export type Quack = {
   id: string;
-  text: string;
+  text: string | null;
   mood: QuackMood | null;
-  userId: string;
+  userId: string | null;
   createdAt: Date;
   updatedAt: Date;
   user?: QuackAuthor;
   poll: Poll | null;
+  isDeleted: boolean;
+  // set on a reply; replies are one level deep
+  parentId: string | null;
+  parent: ReplyParent | null;
+  replyCount: number;
+  // oldest first: the first REPLY_PREVIEW_COUNT in the feed, all of them in a
+  // thread, none on a reply
+  replies: Quack[];
 };
+
+// What deleting did: the quack is gone, or it had replies and became a placeholder.
+export type DeleteOutcome = 'deleted' | 'placeholder';
 
 // What the vote upsert did, for the usage log.
 export type VoteOutcome = 'first' | 'change' | 'same';
@@ -43,6 +67,14 @@ export type VoteOutcome = 'first' | 'change' | 'same';
 export class QuackNotFoundError extends Error {
   constructor() {
     super('Quack not found');
+  }
+}
+
+export class ReplyToReplyError extends Error {
+  constructor() {
+    super(
+      'Replies are one level deep: reply to the quack the reply belongs to',
+    );
   }
 }
 
