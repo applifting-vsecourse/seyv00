@@ -2,9 +2,10 @@ import { Loader2, RefreshCw } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
+import type { Mood } from "@/lib/moods"
 
 import type { Quack } from "@/features/quack/api/quackSchemas"
-import { QuackItem } from "@/features/quack/components/QuackItem"
+import { QuackThread } from "@/features/quack/components/QuackThread"
 
 type QuackListProps = {
   quacks: Quack[]
@@ -21,6 +22,8 @@ type QuackListProps = {
   // Showing only the signed-in user's quacks; it changes what the empty state says.
   isMine?: boolean
   onWriteFirst?: () => void
+  // Preselected in reply forms.
+  defaultMood?: Mood | null
 }
 
 export function QuackList({
@@ -34,6 +37,7 @@ export function QuackList({
   canModerate = false,
   isMine,
   onWriteFirst,
+  defaultMood,
 }: QuackListProps) {
   const isEmpty = !isLoading && !error && quacks.length === 0
 
@@ -107,17 +111,17 @@ export function QuackList({
         </p>
       ) : null}
 
-      {quacks.map((quack) => {
-        const isOwn = currentUserId !== undefined && quack.userId === currentUserId
-        return (
-          <QuackItem
-            key={quack.id}
-            quack={quack}
-            canDelete={isOwn || canModerate}
-            isModerating={!isOwn && canModerate}
-          />
-        )
-      })}
+      {quacks.map((quack) => (
+        <QuackThread
+          key={quack.id}
+          quack={quack}
+          currentUserId={currentUserId}
+          canModerate={canModerate}
+          defaultMood={defaultMood}
+          // "Mine" and search list replies on their own; the feed only threads
+          shouldShowParent
+        />
+      ))}
     </div>
   )
 }

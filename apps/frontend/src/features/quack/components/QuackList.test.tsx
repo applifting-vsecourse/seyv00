@@ -1,40 +1,30 @@
 // Example component test — the pattern to copy for your own components.
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { render, screen, within } from "@testing-library/react"
+import { screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
 
-import type { Quack } from "@/features/quack/api/quackSchemas"
+import { aQuack as quack } from "@/test/quacks"
+import { renderWithRouter } from "@/test/renderWithRouter"
+
 import { QuackList } from "@/features/quack/components/QuackList"
 
-const quack = (overrides: Partial<Quack> = {}): Quack => ({
-  id: "q1",
-  text: "quack quack",
-  mood: null,
-  poll: null,
-  userId: "u1",
-  createdAt: new Date("2026-01-01T12:00:00Z"),
-  user: { id: "u1", name: "Caffeinated Duck", username: "CaffeinatedDuck" },
-  ...overrides,
-})
-
 describe("QuackList", () => {
-  it("renders quacks with author info", () => {
-    render(<QuackList quacks={[quack()]} />)
+  it("renders quacks with author info", async () => {
+    await renderWithRouter(<QuackList quacks={[quack()]} />)
 
     expect(screen.getByText("quack quack")).toBeInTheDocument()
     expect(screen.getByText("Caffeinated Duck")).toBeInTheDocument()
     expect(screen.getByText("@CaffeinatedDuck")).toBeInTheDocument()
   })
 
-  it("shows the mood of a quack that has one", () => {
-    render(<QuackList quacks={[quack({ mood: "silly" })]} />)
+  it("shows the mood of a quack that has one", async () => {
+    await renderWithRouter(<QuackList quacks={[quack({ mood: "silly" })]} />)
 
     expect(screen.getByText("Silly")).toBeInTheDocument()
   })
 
-  it("shows no mood for a quack without one", () => {
-    render(<QuackList quacks={[quack()]} />)
+  it("shows no mood for a quack without one", async () => {
+    await renderWithRouter(<QuackList quacks={[quack()]} />)
 
     for (const label of ["Happy", "Sad", "Angry", "Silly"]) {
       expect(screen.queryByText(label)).not.toBeInTheDocument()
@@ -43,7 +33,7 @@ describe("QuackList", () => {
 
   it("says nothing matches a search, with a way to clear it", async () => {
     const onClearSearch = vi.fn()
-    render(
+    await renderWithRouter(
       <QuackList
         quacks={[]}
         search="zluva"
@@ -58,28 +48,26 @@ describe("QuackList", () => {
     expect(onClearSearch).toHaveBeenCalledOnce()
   })
 
-  it("keeps the original empty state when there is no search", () => {
-    render(<QuackList quacks={[]} />)
+  it("keeps the original empty state when there is no search", async () => {
+    await renderWithRouter(<QuackList quacks={[]} />)
 
     expect(screen.getByText("No quacks yet. Post the first one.")).toBeInTheDocument()
   })
 
-  it("offers delete on the signed-in user's quacks only", () => {
-    render(
-      <QueryClientProvider client={new QueryClient()}>
-        <QuackList
-          currentUserId="u1"
-          quacks={[
-            quack(),
-            quack({
-              id: "q2",
-              text: "not mine",
-              userId: "u2",
-              user: { id: "u2", name: "Bread Critic", username: "BreadCritic" },
-            }),
-          ]}
-        />
-      </QueryClientProvider>,
+  it("offers delete on the signed-in user's quacks only", async () => {
+    await renderWithRouter(
+      <QuackList
+        currentUserId="u1"
+        quacks={[
+          quack(),
+          quack({
+            id: "q2",
+            text: "not mine",
+            userId: "u2",
+            user: { id: "u2", name: "Bread Critic", username: "BreadCritic" },
+          }),
+        ]}
+      />,
     )
 
     const [mine, theirs] = screen.getAllByRole("article") as [HTMLElement, HTMLElement]
@@ -87,23 +75,21 @@ describe("QuackList", () => {
     expect(within(theirs).queryByRole("button", { name: "Delete quack" })).not.toBeInTheDocument()
   })
 
-  it("offers a moderator delete on everyone's quacks", () => {
-    render(
-      <QueryClientProvider client={new QueryClient()}>
-        <QuackList
-          currentUserId="u1"
-          canModerate
-          quacks={[
-            quack(),
-            quack({
-              id: "q2",
-              text: "not mine",
-              userId: "u2",
-              user: { id: "u2", name: "Bread Critic", username: "BreadCritic" },
-            }),
-          ]}
-        />
-      </QueryClientProvider>,
+  it("offers a moderator delete on everyone's quacks", async () => {
+    await renderWithRouter(
+      <QuackList
+        currentUserId="u1"
+        canModerate
+        quacks={[
+          quack(),
+          quack({
+            id: "q2",
+            text: "not mine",
+            userId: "u2",
+            user: { id: "u2", name: "Bread Critic", username: "BreadCritic" },
+          }),
+        ]}
+      />,
     )
 
     const [mine, theirs] = screen.getAllByRole("article") as [HTMLElement, HTMLElement]
@@ -111,15 +97,15 @@ describe("QuackList", () => {
     expect(within(theirs).getByRole("button", { name: "Delete quack" })).toBeInTheDocument()
   })
 
-  it("offers no delete without a signed-in user", () => {
-    render(<QuackList quacks={[quack()]} />)
+  it("offers no delete without a signed-in user", async () => {
+    await renderWithRouter(<QuackList quacks={[quack()]} />)
 
     expect(screen.queryByRole("button", { name: "Delete quack" })).not.toBeInTheDocument()
   })
 
   it("says when I have no quacks yet and offers to write the first", async () => {
     const onWriteFirst = vi.fn()
-    render(
+    await renderWithRouter(
       <QuackList
         quacks={[]}
         isMine
@@ -134,8 +120,8 @@ describe("QuackList", () => {
     expect(onWriteFirst).toHaveBeenCalledOnce()
   })
 
-  it("says nothing matches a search in my quacks too", () => {
-    render(
+  it("says nothing matches a search in my quacks too", async () => {
+    await renderWithRouter(
       <QuackList
         quacks={[]}
         isMine
@@ -149,7 +135,7 @@ describe("QuackList", () => {
 
   it("shows an error with a working reload button", async () => {
     const onReload = vi.fn()
-    render(
+    await renderWithRouter(
       <QuackList
         quacks={[]}
         error={new Error("Server unreachable")}

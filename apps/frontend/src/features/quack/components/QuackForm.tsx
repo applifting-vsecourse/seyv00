@@ -24,7 +24,7 @@ import { useAddQuack } from "@/features/quack/hooks/useAddQuack"
 
 // Mirrors the server-side DTO (MaxLength(280)) so the user is told before
 // the request is made — the server still validates independently.
-const MAX_LENGTH = 280
+export const MAX_LENGTH = 280
 
 // Poll rules, mirrored from the server-side DTO.
 const POLL_MIN_OPTIONS = 2

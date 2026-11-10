@@ -21,10 +21,17 @@ type QuackDeleteButtonProps = {
   quackId: string
   // Set when a moderator deletes someone else's quack.
   authorUsername?: string
+  // Its replies stay, under "This message was deleted".
+  hasReplies?: boolean
 }
 
-// Asks first; on success the quack leaves the feed and this unmounts with it.
-export function QuackDeleteButton({ quackId, authorUsername }: QuackDeleteButtonProps) {
+// Asks first; on success the quack leaves the feed (or becomes a placeholder)
+// and this unmounts with it.
+export function QuackDeleteButton({
+  quackId,
+  authorUsername,
+  hasReplies = false,
+}: QuackDeleteButtonProps) {
   const [isOpen, setIsOpen] = useState(false)
   const deleteQuack = useDeleteQuack()
 
@@ -56,8 +63,10 @@ export function QuackDeleteButton({ quackId, authorUsername }: QuackDeleteButton
             {authorUsername ? `Delete @${authorUsername}'s quack?` : "Delete this quack?"}
           </AlertDialogTitle>
           <AlertDialogDescription>
-            {authorUsername ? "You're removing it as a moderator. " : null}It disappears from the
-            feed for everyone, together with any poll votes. This can&apos;t be undone.
+            {authorUsername ? "You're removing it as a moderator. " : null}
+            {hasReplies
+              ? "Its text and any poll are removed for everyone. The replies stay, under “This message was deleted”. This can’t be undone."
+              : "It disappears from the feed for everyone, together with any poll votes. This can’t be undone."}
           </AlertDialogDescription>
         </AlertDialogHeader>
 
