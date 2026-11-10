@@ -26,15 +26,18 @@ export type Poll = {
   isAuthor: boolean;
 };
 
+// A deleted quack that still has replies stays as a placeholder so its thread
+// holds together: isDeleted is true and text, mood, author and poll are gone.
 export type Quack = {
   id: string;
-  text: string;
+  text: string | null;
   mood: QuackMood | null;
-  userId: string;
+  userId: string | null;
   createdAt: Date;
   updatedAt: Date;
   user?: QuackAuthor;
   poll: Poll | null;
+  isDeleted: boolean;
 };
 
 // What the vote upsert did, for the usage log.

@@ -56,12 +56,16 @@ const mapPrismaQuackToDomain = (
   userId: quack.userId,
   createdAt: quack.createdAt,
   updatedAt: quack.updatedAt,
-  user: {
-    id: quack.user.id,
-    name: quack.user.name,
-    username: quack.user.username ?? '',
-  },
+  // a placeholder has no author
+  user: quack.user
+    ? {
+        id: quack.user.id,
+        name: quack.user.name,
+        username: quack.user.username ?? '',
+      }
+    : undefined,
   poll: mapPrismaPollToDomain(quack, viewerId, votes),
+  isDeleted: quack.deletedAt !== null,
 });
 
 // Search words are user input: escape LIKE wildcards so "100%" or "a_b" match
