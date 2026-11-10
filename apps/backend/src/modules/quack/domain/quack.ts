@@ -72,7 +72,9 @@ export class QuackNotFoundError extends Error {
 
 export class ReplyToReplyError extends Error {
   constructor() {
-    super('Replies are one level deep: reply to the quack the reply belongs to');
+    super(
+      'Replies are one level deep: reply to the quack the reply belongs to',
+    );
   }
 }
 

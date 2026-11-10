@@ -206,11 +206,31 @@ Please stop tagging me.`,
   const shortcutUpdate = exampleQuacks[5];
   const shortcutReplies: { author: User; minutesAgo: number; text: string }[] =
     [
-      { author: deepDuckThoughts, minutesAgo: 1200, text: `Is a shortcut that takes longer just a scenic route with low self-esteem?` },
-      { author: breadCritic, minutesAgo: 1150, text: `Did the mountain at least have bread on it?` },
-      { author: migrationSeason, minutesAgo: 1100, text: `@BreadCritic It had one (1) suspicious bun. We did not stop.` },
-      { author: caffeinatedDuck, minutesAgo: 1000, text: `90 km is like 40 espressos of flying. respect` },
-      { author: pondAdmin, minutesAgo: 900, text: `Please file mountain-related complaints with the heron.` },
+      {
+        author: deepDuckThoughts,
+        minutesAgo: 1200,
+        text: `Is a shortcut that takes longer just a scenic route with low self-esteem?`,
+      },
+      {
+        author: breadCritic,
+        minutesAgo: 1150,
+        text: `Did the mountain at least have bread on it?`,
+      },
+      {
+        author: migrationSeason,
+        minutesAgo: 1100,
+        text: `@BreadCritic It had one (1) suspicious bun. We did not stop.`,
+      },
+      {
+        author: caffeinatedDuck,
+        minutesAgo: 1000,
+        text: `90 km is like 40 espressos of flying. respect`,
+      },
+      {
+        author: pondAdmin,
+        minutesAgo: 900,
+        text: `Please file mountain-related complaints with the heron.`,
+      },
     ];
   for (const { author, minutesAgo, text } of shortcutReplies) {
     await createQuack(prisma, {
@@ -228,8 +248,16 @@ Please stop tagging me.`,
     createdAt: new Date(now - 1800 * MINUTE_IN_MS),
   });
   for (const { author, minutesAgo, text } of [
-    { author: breadCritic, minutesAgo: 1790, text: `Bold take. Wrong, but bold.` },
-    { author: caffeinatedDuck, minutesAgo: 1780, text: `ok what did it say?? i was making coffee` },
+    {
+      author: breadCritic,
+      minutesAgo: 1790,
+      text: `Bold take. Wrong, but bold.`,
+    },
+    {
+      author: caffeinatedDuck,
+      minutesAgo: 1780,
+      text: `ok what did it say?? i was making coffee`,
+    },
   ]) {
     await createQuack(prisma, {
       text,

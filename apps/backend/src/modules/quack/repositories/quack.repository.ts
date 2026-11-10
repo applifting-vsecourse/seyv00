@@ -146,7 +146,9 @@ export class QuackRepository {
    */
   async getQuacks(viewerId: string, authorId?: string): Promise<Quack[]> {
     const quacks = await this.prisma.quack.findMany({
-      where: authorId ? { userId: authorId } : { parentId: null, ...shownQuack },
+      where: authorId
+        ? { userId: authorId }
+        : { parentId: null, ...shownQuack },
       include: feedInclude,
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     });
@@ -355,7 +357,11 @@ export class QuackRepository {
       });
       if (count === 0) return null;
       await tx.quack.deleteMany({
-        where: { id: parentId, deletedAt: { not: null }, replies: { none: {} } },
+        where: {
+          id: parentId,
+          deletedAt: { not: null },
+          replies: { none: {} },
+        },
       });
       return 'deleted';
     });

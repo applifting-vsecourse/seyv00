@@ -78,7 +78,8 @@ export class QuackResponseDto {
   @ApiProperty({
     type: ReplyParentDto,
     nullable: true,
-    description: 'What this reply answers, for its header; null on a top-level quack',
+    description:
+      'What this reply answers, for its header; null on a top-level quack',
   })
   parent!: ReplyParentDto | null;
 
