@@ -191,11 +191,55 @@ Please stop tagging me.`,
     })),
   });
 
+  const createdQuacks = new Map<string, string>();
   for (const { author, minutesAgo, text } of exampleQuacks) {
-    await createQuack(prisma, {
+    const quack = await createQuack(prisma, {
       text,
       userId: author.id,
       createdAt: new Date(now - minutesAgo * MINUTE_IN_MS),
     });
+    createdQuacks.set(text, quack.id);
   }
+
+  // Replies, so threads have something to show right after seeding: one thread
+  // long enough for "Show more replies", one under a deleted quack.
+  const shortcutUpdate = exampleQuacks[5];
+  const shortcutReplies: { author: User; minutesAgo: number; text: string }[] =
+    [
+      { author: deepDuckThoughts, minutesAgo: 1200, text: `Is a shortcut that takes longer just a scenic route with low self-esteem?` },
+      { author: breadCritic, minutesAgo: 1150, text: `Did the mountain at least have bread on it?` },
+      { author: migrationSeason, minutesAgo: 1100, text: `@BreadCritic It had one (1) suspicious bun. We did not stop.` },
+      { author: caffeinatedDuck, minutesAgo: 1000, text: `90 km is like 40 espressos of flying. respect` },
+      { author: pondAdmin, minutesAgo: 900, text: `Please file mountain-related complaints with the heron.` },
+    ];
+  for (const { author, minutesAgo, text } of shortcutReplies) {
+    await createQuack(prisma, {
+      text,
+      userId: author.id,
+      createdAt: new Date(now - minutesAgo * MINUTE_IN_MS),
+      parentId: createdQuacks.get(shortcutUpdate.text),
+    });
+  }
+
+  // Its author deleted it after people had replied: only a placeholder is left.
+  const deleted = await createQuack(prisma, {
+    text: 'deleted before seeding finished',
+    userId: deepDuckThoughts.id,
+    createdAt: new Date(now - 1800 * MINUTE_IN_MS),
+  });
+  for (const { author, minutesAgo, text } of [
+    { author: breadCritic, minutesAgo: 1790, text: `Bold take. Wrong, but bold.` },
+    { author: caffeinatedDuck, minutesAgo: 1780, text: `ok what did it say?? i was making coffee` },
+  ]) {
+    await createQuack(prisma, {
+      text,
+      userId: author.id,
+      createdAt: new Date(now - minutesAgo * MINUTE_IN_MS),
+      parentId: deleted.id,
+    });
+  }
+  await prisma.quack.update({
+    where: { id: deleted.id },
+    data: { text: null, mood: null, userId: null, deletedAt: new Date() },
+  });
 };

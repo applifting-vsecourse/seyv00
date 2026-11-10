@@ -45,7 +45,7 @@ Notifications about replies, nested threads, editing quacks or replies, converti
 
 ## Where it lands
 
-- **Backend, `modules/quack`**: the `Quack` domain type (nullable author and text, `isDeleted`, `parent`, `replyCount`, reply preview); the repository (feed, "Mine", search and thread queries, create reply, delete-or-placeholder, placeholder cleanup); the service (reply rules, delete branching, permission checks as today); the controller (`GET /api/quacks/:id`, `GET /api/quacks/:id/replies`, `POST /api/quacks/:id/replies`) and response DTOs. The seed gets a couple of threads.
+- **Backend, `modules/quack`**: the `Quack` domain type (nullable author and text, `isDeleted`, `parent`, `replyCount`, reply preview); the repository (feed, "Mine", search and thread queries, create reply, delete-or-placeholder, placeholder cleanup); the service (reply rules, delete branching, permission checks as today); the controller (`GET /api/quacks/:id` for the thread page and for **Show more replies**, `POST /api/quacks/:id/replies`) and response DTOs. The seed gets a couple of threads.
 - **Frontend, `features/quack`**: the feed item (reply list, **Show more**, **Reply**, placeholder state), the reply form (the quack form without the poll), the reply header in "Mine" and search, zod schemas, the delete dialog. A new route `routes/_ProtectedPages/quacks.$id.tsx` for the thread page.
 - **Touches existing features**: feed, "Mine" filter, search (raw SQL with `unaccent`), delete and admin moderation, polls (deleted with the content), default mood.
 - **E2E**: reply and see it under the quack; delete a quack with replies and see the placeholder with the replies; delete the last reply and see the thread vanish.

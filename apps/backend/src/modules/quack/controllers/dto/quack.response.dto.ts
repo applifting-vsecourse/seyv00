@@ -13,6 +13,21 @@ class QuackUserDto {
   username!: string;
 }
 
+class ReplyParentDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty({ description: 'The quack replied to was deleted' })
+  isDeleted!: boolean;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Null when the quack replied to was deleted',
+  })
+  username!: string | null;
+}
+
 export class QuackResponseDto {
   @ApiProperty()
   id!: string;
@@ -53,6 +68,30 @@ export class QuackResponseDto {
   })
   isDeleted!: boolean;
 
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'The quack this one replies to; null on a top-level quack',
+  })
+  parentId!: string | null;
+
+  @ApiProperty({
+    type: ReplyParentDto,
+    nullable: true,
+    description: 'What this reply answers, for its header; null on a top-level quack',
+  })
+  parent!: ReplyParentDto | null;
+
+  @ApiProperty({ description: 'All replies, however many are included below' })
+  replyCount!: number;
+
+  @ApiProperty({
+    type: () => [QuackResponseDto],
+    description:
+      'Oldest first: the first few in a list of quacks, all of them for a single thread, none on a reply',
+  })
+  replies!: QuackResponseDto[];
+
   static fromDomain(quack: Quack): QuackResponseDto {
     if (!quack.isDeleted && !quack.user) {
       throw new Error(
@@ -74,6 +113,10 @@ export class QuackResponseDto {
         : null,
       poll: quack.poll ? PollResponseDto.fromDomain(quack.poll) : null,
       isDeleted: quack.isDeleted,
+      parentId: quack.parentId,
+      parent: quack.parent,
+      replyCount: quack.replyCount,
+      replies: quack.replies.map(QuackResponseDto.fromDomain),
     };
   }
 }
