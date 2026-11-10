@@ -111,8 +111,9 @@ export class QuacksService {
   }
 
   async deleteQuack(user: Identity, quackId: string): Promise<void> {
-    const authorId = await this.quackRepository.getQuackAuthorId(quackId);
-    if (authorId === null) throw new QuackNotFoundError();
+    const target = await this.quackRepository.getDeleteTarget(quackId);
+    if (target === null) throw new QuackNotFoundError();
+    const { authorId, parentId } = target;
     // the author or a moderator may delete; both come from the session
     const isOwner = authorId === user.id;
     const isAdmin = user.role === 'admin';
@@ -123,7 +124,11 @@ export class QuacksService {
     }
     // the repository decides between deleting and leaving a placeholder,
     // depending on whether the quack has replies at that very moment
-    const outcome = await this.quackRepository.deleteQuack(quackId, authorId);
+    const outcome = await this.quackRepository.deleteQuack(
+      quackId,
+      authorId,
+      parentId,
+    );
     // gone in the meantime, e.g. deleted from another tab
     if (outcome === null) throw new QuackNotFoundError();
     if (!isOwner) {

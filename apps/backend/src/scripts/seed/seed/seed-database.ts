@@ -118,12 +118,6 @@ send help or more caffeine`,
       text: `If a pond reflects the sky, is the sky just a very large and very shy pond?`,
     },
     {
-      author: migrationSeason,
-      minutesAgo: 1240,
-      text: `Update on the shortcut: it added 90 km and one entire mountain.
-We are not currently speaking to the front of the V.`,
-    },
-    {
       author: pondAdmin,
       minutesAgo: 890,
       text: `Whoever keeps rearranging the stones on the west bank — we see you.
@@ -191,19 +185,24 @@ Please stop tagging me.`,
     })),
   });
 
-  const createdQuacks = new Map<string, string>();
   for (const { author, minutesAgo, text } of exampleQuacks) {
-    const quack = await createQuack(prisma, {
+    await createQuack(prisma, {
       text,
       userId: author.id,
       createdAt: new Date(now - minutesAgo * MINUTE_IN_MS),
     });
-    createdQuacks.set(text, quack.id);
   }
 
   // Replies, so threads have something to show right after seeding: one thread
   // long enough for "Show more replies", one under a deleted quack.
-  const shortcutUpdate = exampleQuacks[5];
+  // Created on its own so the replies get its id directly, not by looking it
+  // up again (a lookup that misses would quietly make them top-level quacks).
+  const shortcutUpdate = await createQuack(prisma, {
+    text: `Update on the shortcut: it added 90 km and one entire mountain.
+We are not currently speaking to the front of the V.`,
+    userId: migrationSeason.id,
+    createdAt: new Date(now - 1240 * MINUTE_IN_MS),
+  });
   const shortcutReplies: { author: User; minutesAgo: number; text: string }[] =
     [
       {
@@ -237,7 +236,7 @@ Please stop tagging me.`,
       text,
       userId: author.id,
       createdAt: new Date(now - minutesAgo * MINUTE_IN_MS),
-      parentId: createdQuacks.get(shortcutUpdate.text),
+      parentId: shortcutUpdate.id,
     });
   }
 

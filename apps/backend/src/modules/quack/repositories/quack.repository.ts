@@ -23,27 +23,29 @@ const quackInclude = {
   _count: { select: { replies: true } },
 } satisfies Prisma.QuackInclude;
 
+// A reply nested under its thread: its parent is that thread and it has no
+// poll and no replies, so only the author is loaded.
+const replyInclude = { user: true } satisfies Prisma.QuackInclude;
+
+const replyOrder = [
+  { createdAt: 'asc' },
+  { id: 'asc' },
+] satisfies Prisma.QuackOrderByWithRelationInput[];
+
 // A thread: the quack with all its replies, oldest first.
 const threadInclude = {
   ...quackInclude,
-  replies: {
-    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-    include: quackInclude,
-  },
-} satisfies Prisma.QuackInclude;
-
-// The feed: like a thread, but only the first few replies.
-const feedInclude = {
-  ...quackInclude,
-  replies: { ...threadInclude.replies, take: REPLY_PREVIEW_COUNT },
+  replies: { orderBy: replyOrder, include: replyInclude },
 } satisfies Prisma.QuackInclude;
 
 type PrismaQuackWithRelations = Prisma.QuackGetPayload<{
   include: typeof quackInclude;
 }>;
 
+type PrismaReply = Prisma.QuackGetPayload<{ include: typeof replyInclude }>;
+
 type PrismaQuackWithReplies = PrismaQuackWithRelations & {
-  replies?: PrismaQuackWithRelations[];
+  replies?: PrismaReply[];
 };
 
 // A placeholder without replies has nothing left to show: it is never read,
@@ -96,6 +98,37 @@ const mapPrismaParentToDomain = (
       }
     : null;
 
+const mapPrismaUserToDomain = (user: PrismaReply['user']): Quack['user'] =>
+  // a placeholder has no author
+  user
+    ? { id: user.id, name: user.name, username: user.username ?? '' }
+    : undefined;
+
+// A reply shown under its thread: the thread is its parent, and a reply never
+// has a poll or replies of its own.
+const mapPrismaReplyToDomain = (
+  reply: PrismaReply,
+  thread: PrismaQuackWithRelations,
+): Quack => ({
+  id: reply.id,
+  text: reply.text,
+  mood: reply.mood,
+  userId: reply.userId,
+  createdAt: reply.createdAt,
+  updatedAt: reply.updatedAt,
+  user: mapPrismaUserToDomain(reply.user),
+  poll: null,
+  isDeleted: false,
+  parentId: thread.id,
+  parent: {
+    id: thread.id,
+    isDeleted: thread.deletedAt !== null,
+    username: thread.user?.username ?? null,
+  },
+  replyCount: 0,
+  replies: [],
+});
+
 const mapPrismaQuackToDomain = (
   quack: PrismaQuackWithReplies,
   viewerId: string,
@@ -107,21 +140,14 @@ const mapPrismaQuackToDomain = (
   userId: quack.userId,
   createdAt: quack.createdAt,
   updatedAt: quack.updatedAt,
-  // a placeholder has no author
-  user: quack.user
-    ? {
-        id: quack.user.id,
-        name: quack.user.name,
-        username: quack.user.username ?? '',
-      }
-    : undefined,
+  user: mapPrismaUserToDomain(quack.user),
   poll: mapPrismaPollToDomain(quack, viewerId, votes),
   isDeleted: quack.deletedAt !== null,
   parentId: quack.parentId,
   parent: mapPrismaParentToDomain(quack.parent),
   replyCount: quack._count.replies,
   replies: (quack.replies ?? []).map((reply) =>
-    mapPrismaQuackToDomain(reply, viewerId, votes),
+    mapPrismaReplyToDomain(reply, quack),
   ),
 });
 
@@ -149,10 +175,10 @@ export class QuackRepository {
       where: authorId
         ? { userId: authorId }
         : { parentId: null, ...shownQuack },
-      include: feedInclude,
+      include: quackInclude,
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     });
-    return this.mapWithVotes(quacks, viewerId);
+    return this.mapWithVotes(await this.withReplyPreviews(quacks), viewerId);
   }
 
   /**
@@ -255,10 +281,10 @@ export class QuackRepository {
         id: { in: matches.map((match) => match.id) },
         userId: authorId,
       },
-      include: feedInclude,
+      include: quackInclude,
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     });
-    return this.mapWithVotes(quacks, viewerId);
+    return this.mapWithVotes(await this.withReplyPreviews(quacks), viewerId);
   }
 
   async createQuack(createQuackData: {
@@ -307,38 +333,41 @@ export class QuackRepository {
   async deleteQuack(
     quackId: string,
     authorId: string,
+    parentId: string | null,
   ): Promise<DeleteOutcome | null> {
-    const quack = await this.prisma.quack.findFirst({
-      where: { id: quackId, userId: authorId },
-      select: { parentId: true },
-    });
-    if (!quack) return null;
-    if (quack.parentId !== null) {
-      return this.deleteReply(quackId, quack.parentId, authorId);
+    if (parentId !== null) {
+      return this.deleteReply(quackId, parentId, authorId);
     }
 
-    try {
-      const { count } = await this.prisma.quack.deleteMany({
-        where: { id: quackId, userId: authorId, replies: { none: {} } },
-      });
-      if (count > 0) return 'deleted';
-    } catch (error) {
-      // A reply arrived between the check above and the delete: the database
-      // refused the delete (ON DELETE NO ACTION), so fall through to the
-      // placeholder. The reply is never lost.
-      if (!isForeignKeyViolation(error)) throw error;
-    }
+    return this.prisma.$transaction(async (tx) => {
+      // Lock the quack. Adding a reply (its foreign key needs a share lock)
+      // and deleting a reply (see deleteReply) wait for this lock, so the
+      // replies counted below are the ones there when we commit: a quack that
+      // just lost its last reply is deleted, never left as an empty
+      // placeholder, and a reply that just arrived is never lost.
+      const locked = await tx.$queryRaw<{ id: string }[]>`
+        SELECT "id" FROM "quack"
+        WHERE "id" = ${quackId} AND "userId" = ${authorId}
+        FOR UPDATE
+      `;
+      if (locked.length === 0) return null;
 
-    const [, { count }] = await this.prisma.$transaction([
+      const replyCount = await tx.quack.count({ where: { parentId: quackId } });
+      if (replyCount === 0) {
+        // poll answers and votes go with it (onDelete: Cascade)
+        await tx.quack.delete({ where: { id: quackId } });
+        return 'deleted';
+      }
+
       // votes go with their answers (onDelete: Cascade)
-      this.prisma.pollOption.deleteMany({ where: { quackId } }),
-      this.prisma.quack.updateMany({
-        where: { id: quackId, userId: authorId },
+      await tx.pollOption.deleteMany({ where: { quackId } });
+      await tx.quack.update({
+        where: { id: quackId },
         // all four together, or quack_placeholder_check refuses the row
         data: { text: null, mood: null, userId: null, deletedAt: new Date() },
-      }),
-    ]);
-    return count > 0 ? 'placeholder' : null;
+      });
+      return 'placeholder';
+    });
   }
 
   private async deleteReply(
@@ -350,7 +379,8 @@ export class QuackRepository {
       // Lock the parent first. Two people deleting the last two replies at
       // once then take turns, and the second one sees the first one's delete
       // and removes the empty placeholder. While the lock is held nobody can
-      // add a reply either (that needs a share lock on the parent).
+      // add a reply (that needs a share lock on the parent) or turn the
+      // parent into a placeholder (deleteQuack locks it too).
       await tx.$queryRaw`SELECT 1 FROM "quack" WHERE "id" = ${parentId} FOR UPDATE`;
       const { count } = await tx.quack.deleteMany({
         where: { id: replyId, userId: authorId },
@@ -368,15 +398,19 @@ export class QuackRepository {
   }
 
   /**
-   * Who wrote the quack, or null when there's nothing to delete: no such
-   * quack, or a placeholder (which has no author and can't be deleted directly).
+   * Who wrote the quack and what it replies to, or null when there's nothing
+   * to delete: no such quack, or a placeholder (which has no author and can't
+   * be deleted directly).
    */
-  async getQuackAuthorId(quackId: string): Promise<string | null> {
+  async getDeleteTarget(
+    quackId: string,
+  ): Promise<{ authorId: string; parentId: string | null } | null> {
     const quack = await this.prisma.quack.findUnique({
       where: { id: quackId },
-      select: { userId: true },
+      select: { userId: true, parentId: true },
     });
-    return quack?.userId ?? null;
+    if (!quack?.userId) return null;
+    return { authorId: quack.userId, parentId: quack.parentId };
   }
 
   /** The poll's answer ids, or null when there's no such quack or it isn't a poll. */
@@ -421,6 +455,48 @@ export class QuackRepository {
     `;
     if (rows.length === 0) return 'same';
     return rows[0].inserted ? 'first' : 'change';
+  }
+
+  /**
+   * The first few replies of each quack, for the feed and search results.
+   * A nested `take` would make Prisma load every reply and cut them down in
+   * memory, so the limit per thread is applied in SQL instead.
+   */
+  private async withReplyPreviews(
+    quacks: PrismaQuackWithRelations[],
+  ): Promise<PrismaQuackWithReplies[]> {
+    const threadIds = quacks
+      .filter((quack) => quack._count.replies > 0)
+      .map((quack) => quack.id);
+    if (threadIds.length === 0) return quacks;
+
+    const previews = await this.prisma.$queryRaw<{ id: string }[]>`
+      SELECT "id" FROM (
+        SELECT "id", row_number() OVER (
+          PARTITION BY "parentId" ORDER BY "createdAt", "id"
+        ) AS "position"
+        FROM "quack"
+        WHERE "parentId" IN (${Prisma.join(threadIds)})
+      ) AS "reply"
+      WHERE "position" <= ${REPLY_PREVIEW_COUNT}
+    `;
+    const replies = await this.prisma.quack.findMany({
+      where: { id: { in: previews.map((preview) => preview.id) } },
+      include: replyInclude,
+      orderBy: replyOrder,
+    });
+
+    const repliesByThread = new Map<string, PrismaReply[]>();
+    for (const reply of replies) {
+      if (reply.parentId === null) continue;
+      const threadReplies = repliesByThread.get(reply.parentId) ?? [];
+      threadReplies.push(reply);
+      repliesByThread.set(reply.parentId, threadReplies);
+    }
+    return quacks.map((quack) => ({
+      ...quack,
+      replies: repliesByThread.get(quack.id) ?? [],
+    }));
   }
 
   // Two queries however many polls the feed holds — and none without polls.
