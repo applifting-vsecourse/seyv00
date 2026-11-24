@@ -56,8 +56,11 @@ export type Quack = {
   // oldest first: the first REPLY_PREVIEW_COUNT in the feed, all of them in a
   // thread, none on a reply
   replies: Quack[];
-  // Likes (cases.md, ADR 0002). Optional only until the feature is
-  // implemented; then every quack carries both.
+  // Likes (ADR 0002): how many, and whether the viewer is one of them. Who
+  // liked is never part of a quack. The repository always sets both (0 and
+  // false on a placeholder); they're optional only so that quacks built
+  // without likes, as the existing unit tests do, still type-check. The
+  // response DTO reads a missing value as 0 / false.
   likeCount?: number;
   likedByMe?: boolean;
 };

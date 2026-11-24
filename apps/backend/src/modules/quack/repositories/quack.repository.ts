@@ -21,12 +21,16 @@ const quackInclude = {
   parent: {
     select: { id: true, deletedAt: true, user: { select: { username: true } } },
   },
-  _count: { select: { replies: true } },
+  // likes are counted from their rows, never stored (ADR 0002)
+  _count: { select: { replies: true, likes: true } },
 } satisfies Prisma.QuackInclude;
 
 // A reply nested under its thread: its parent is that thread and it has no
-// poll and no replies, so only the author is loaded.
-const replyInclude = { user: true } satisfies Prisma.QuackInclude;
+// poll and no replies, so only the author and the like count are loaded.
+const replyInclude = {
+  user: true,
+  _count: { select: { likes: true } },
+} satisfies Prisma.QuackInclude;
 
 const replyOrder = [
   { createdAt: 'asc' },
@@ -69,6 +73,11 @@ type PollVotes = {
   myVotes: Map<string, string>;
 };
 
+// The ids of the quacks (replies included) the viewer has liked.
+type ViewerLikes = Set<string>;
+
+const noLikes: ViewerLikes = new Set();
+
 const mapPrismaPollToDomain = (
   quack: PrismaQuackWithRelations,
   viewerId: string,
@@ -110,6 +119,7 @@ const mapPrismaUserToDomain = (user: PrismaReply['user']): Quack['user'] =>
 const mapPrismaReplyToDomain = (
   reply: PrismaReply,
   thread: PrismaQuackWithRelations,
+  viewerLikes: ViewerLikes,
 ): Quack => ({
   id: reply.id,
   text: reply.text,
@@ -128,12 +138,15 @@ const mapPrismaReplyToDomain = (
   },
   replyCount: 0,
   replies: [],
+  likeCount: reply._count.likes,
+  likedByMe: viewerLikes.has(reply.id),
 });
 
 const mapPrismaQuackToDomain = (
   quack: PrismaQuackWithReplies,
   viewerId: string,
   votes: PollVotes,
+  viewerLikes: ViewerLikes,
 ): Quack => ({
   id: quack.id,
   text: quack.text,
@@ -148,8 +161,12 @@ const mapPrismaQuackToDomain = (
   parent: mapPrismaParentToDomain(quack.parent),
   replyCount: quack._count.replies,
   replies: (quack.replies ?? []).map((reply) =>
-    mapPrismaReplyToDomain(reply, quack),
+    mapPrismaReplyToDomain(reply, quack, viewerLikes),
   ),
+  // A placeholder's likes are erased with its content (ADR 0001, 0002); it
+  // never shows any, even if one slipped in some other way.
+  likeCount: quack.deletedAt === null ? quack._count.likes : 0,
+  likedByMe: quack.deletedAt === null && viewerLikes.has(quack.id),
 });
 
 // Search words are user input: escape LIKE wildcards so "100%" or "a_b" match
@@ -179,7 +196,7 @@ export class QuackRepository {
       include: quackInclude,
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     });
-    return this.mapWithVotes(await this.withReplyPreviews(quacks), viewerId);
+    return this.mapForViewer(await this.withReplyPreviews(quacks), viewerId);
   }
 
   /**
@@ -192,7 +209,7 @@ export class QuackRepository {
       include: threadInclude,
     });
     if (!quack) return null;
-    const [mapped] = await this.mapWithVotes([quack], viewerId);
+    const [mapped] = await this.mapForViewer([quack], viewerId);
     return mapped;
   }
 
@@ -229,11 +246,13 @@ export class QuackRepository {
         },
         include: quackInclude,
       });
-      // a reply has no poll, so there are no votes to load
-      return mapPrismaQuackToDomain(reply, replyData.userId, {
-        counts: new Map(),
-        myVotes: new Map(),
-      });
+      // a reply has no poll, so there are no votes to load; a new one has no likes
+      return mapPrismaQuackToDomain(
+        reply,
+        replyData.userId,
+        { counts: new Map(), myVotes: new Map() },
+        noLikes,
+      );
     } catch (error) {
       // `connect` reports a missing parent as P2025, the foreign key as P2003
       if (
@@ -285,7 +304,7 @@ export class QuackRepository {
       include: quackInclude,
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     });
-    return this.mapWithVotes(await this.withReplyPreviews(quacks), viewerId);
+    return this.mapForViewer(await this.withReplyPreviews(quacks), viewerId);
   }
 
   async createQuack(createQuackData: {
@@ -311,10 +330,13 @@ export class QuackRepository {
       },
       include: quackInclude,
     });
-    return mapPrismaQuackToDomain(quack, createQuackData.userId, {
-      counts: new Map(),
-      myVotes: new Map(),
-    });
+    // a new quack has no votes and no likes yet
+    return mapPrismaQuackToDomain(
+      quack,
+      createQuackData.userId,
+      { counts: new Map(), myVotes: new Map() },
+      noLikes,
+    );
   }
 
   /**
@@ -360,8 +382,10 @@ export class QuackRepository {
         return 'deleted';
       }
 
-      // votes go with their answers (onDelete: Cascade)
+      // votes go with their answers (onDelete: Cascade); likes are content
+      // of the quack too and go with it (ADR 0002)
       await tx.pollOption.deleteMany({ where: { quackId } });
+      await tx.quackLike.deleteMany({ where: { quackId } });
       await tx.quack.update({
         where: { id: quackId },
         // all four together, or quack_placeholder_check refuses the row
@@ -417,25 +441,59 @@ export class QuackRepository {
   /**
    * Adds the user's like if it isn't there yet and returns the quack's likes
    * afterwards, or null when there's no such quack or it is a placeholder.
-   * Not implemented yet (cases.md, ADR 0002).
+   * The primary key (quackId, userId) makes a second like impossible, even
+   * from two requests at once: the second insert just does nothing.
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async likeQuack(quackId: string, userId: string): Promise<LikeState | null> {
-    throw new Error('not implemented');
+    return this.changeLike(quackId, userId, async (tx) => {
+      await tx.$executeRaw`
+        INSERT INTO "quack_like" ("quackId", "userId")
+        VALUES (${quackId}, ${userId})
+        ON CONFLICT ("quackId", "userId") DO NOTHING
+      `;
+    });
   }
 
   /**
    * Removes the user's like if it is there and returns the quack's likes
    * afterwards, or null when there's no such quack or it is a placeholder.
-   * Not implemented yet (cases.md, ADR 0002).
+   * Only this user's like: whoever asks, nobody removes someone else's.
    */
   async unlikeQuack(
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     quackId: string,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     userId: string,
   ): Promise<LikeState | null> {
-    throw new Error('not implemented');
+    return this.changeLike(quackId, userId, async (tx) => {
+      await tx.quackLike.deleteMany({ where: { quackId, userId } });
+    });
+  }
+
+  private async changeLike(
+    quackId: string,
+    userId: string,
+    change: (tx: Prisma.TransactionClient) => Promise<void>,
+  ): Promise<LikeState | null> {
+    return this.prisma.$transaction(async (tx) => {
+      // A share lock on the quack. deleteQuack locks it FOR UPDATE, so a like
+      // that arrives while the quack becomes a placeholder waits, then sees
+      // the placeholder and is refused, instead of landing on it.
+      const [quack] = await tx.$queryRaw<{ deletedAt: Date | null }[]>`
+        SELECT "deletedAt" FROM "quack" WHERE "id" = ${quackId} FOR SHARE
+      `;
+      if (!quack || quack.deletedAt !== null) return null;
+
+      await change(tx);
+
+      // the state after the change, everyone's likes included
+      const [likeCount, mine] = await Promise.all([
+        tx.quackLike.count({ where: { quackId } }),
+        tx.quackLike.findUnique({
+          where: { quackId_userId: { quackId, userId } },
+          select: { userId: true },
+        }),
+      ]);
+      return { likeCount, likedByMe: mine !== null };
+    });
   }
 
   /** The poll's answer ids, or null when there's no such quack or it isn't a poll. */
@@ -453,7 +511,7 @@ export class QuackRepository {
       include: quackInclude,
     });
     if (!quack) return null;
-    const [mapped] = await this.mapWithVotes([quack], viewerId);
+    const [mapped] = await this.mapForViewer([quack], viewerId);
     return mapped.poll;
   }
 
@@ -524,15 +582,30 @@ export class QuackRepository {
     }));
   }
 
-  // Two queries however many polls the feed holds — and none without polls.
-  // Replies never carry a poll, so only the quacks themselves are looked at.
-  private async mapWithVotes(
+  // What the viewer has done to these quacks: their poll votes and likes.
+  // Polls: two queries however many the feed holds, none without polls;
+  // replies never carry a poll. Likes: one query for the quacks and their
+  // replies together (the counts come with the quacks, see quackInclude).
+  private async mapForViewer(
     quacks: PrismaQuackWithReplies[],
     viewerId: string,
   ): Promise<Quack[]> {
     const pollIds = quacks
       .filter((quack) => quack.pollOptions.length > 0)
       .map((quack) => quack.id);
+    const shownIds = quacks.flatMap((quack) => [
+      quack.id,
+      ...(quack.replies ?? []).map((reply) => reply.id),
+    ]);
+
+    const viewerLikes: ViewerLikes = new Set();
+    if (shownIds.length > 0) {
+      const liked = await this.prisma.quackLike.findMany({
+        where: { userId: viewerId, quackId: { in: shownIds } },
+        select: { quackId: true },
+      });
+      for (const like of liked) viewerLikes.add(like.quackId);
+    }
 
     const votes: PollVotes = { counts: new Map(), myVotes: new Map() };
     if (pollIds.length > 0) {
@@ -556,7 +629,7 @@ export class QuackRepository {
     }
 
     return quacks.map((quack) =>
-      mapPrismaQuackToDomain(quack, viewerId, votes),
+      mapPrismaQuackToDomain(quack, viewerId, votes, viewerLikes),
     );
   }
 }

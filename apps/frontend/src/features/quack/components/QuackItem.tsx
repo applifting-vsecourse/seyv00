@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils"
 
 import type { Reply } from "@/features/quack/api/quackSchemas"
 import { QuackDeleteButton } from "@/features/quack/components/QuackDeleteButton"
+import { QuackLikeButton } from "@/features/quack/components/QuackLikeButton"
 import { QuackMood } from "@/features/quack/components/QuackMood"
 import { QuackPoll } from "@/features/quack/components/QuackPoll"
 import { UsersName } from "@/features/quack/components/UsersName"
@@ -21,7 +22,7 @@ type QuackItemProps = {
   canDelete?: boolean
   // A moderator deleting someone else's quack; the dialog says whose it is.
   isModerating?: boolean
-  // Set inside the app: the time links to the thread and a Reply action shows.
+  // Set inside the app: the time links to the thread, and Reply and Like show.
   // Left out on the landing page's static sample.
   onReply?: () => void
   // Says what a reply answers, where it shows up away from its thread ("Mine", search).
@@ -120,17 +121,22 @@ export function QuackItem({
           />
         ) : null}
         {onReply ? (
-          <div>
+          <div className="-ml-3 flex items-center gap-1">
             <Button
               variant="ghost"
               size="sm"
-              className="-ml-3 text-muted-foreground"
+              className="text-muted-foreground"
               onClick={onReply}
               aria-label={`Reply to @${username}`}
             >
               <ReplyIcon className="size-4" />
               Reply
             </Button>
+            <QuackLikeButton
+              quackId={quack.id}
+              likeCount={quack.likeCount ?? 0}
+              isLikedByMe={quack.likedByMe ?? false}
+            />
           </div>
         ) : null}
       </div>

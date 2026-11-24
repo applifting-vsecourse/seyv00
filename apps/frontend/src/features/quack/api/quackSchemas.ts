@@ -51,6 +51,18 @@ export const liveQuackSchema = z.object({
   userId: z.string(),
   user: quackUserSchema,
   poll: pollSchema.nullable(),
+  // Likes: how many, and whether the signed-in user is one of them. The server
+  // always sends both; they're optional so quacks built without them (the
+  // landing page's sample, the existing test data) still fit. Missing reads as
+  // 0 / not liked.
+  likeCount: z.number().int().nonnegative().optional(),
+  likedByMe: z.boolean().optional(),
+})
+
+// A quack's likes after a like or unlike.
+export const likeStateSchema = z.object({
+  likeCount: z.number().int().nonnegative(),
+  likedByMe: z.boolean(),
 })
 
 // A deleted quack kept only because it has replies: its content and author are gone.

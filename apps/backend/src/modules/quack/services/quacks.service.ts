@@ -140,16 +140,25 @@ export class QuacksService {
     }
   }
 
-  /** Not implemented yet (cases.md, ADR 0002). */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  /**
+   * Likes a quack or a reply, the author's own included; liking again changes
+   * nothing. A deleted message (placeholder) can't be liked: not found.
+   */
   async likeQuack(user: Identity, quackId: string): Promise<LikeState> {
-    throw new Error('not implemented');
+    // the liker is taken from the session, never from the request
+    const likes = await this.quackRepository.likeQuack(quackId, user.id);
+    if (!likes) throw new QuackNotFoundError();
+    return likes;
   }
 
-  /** Not implemented yet (cases.md, ADR 0002). */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  /**
+   * Takes the user's own like back; nothing to take back is fine. Nobody, an
+   * admin included, can remove someone else's like.
+   */
   async unlikeQuack(user: Identity, quackId: string): Promise<LikeState> {
-    throw new Error('not implemented');
+    const likes = await this.quackRepository.unlikeQuack(quackId, user.id);
+    if (!likes) throw new QuackNotFoundError();
+    return likes;
   }
 
   async vote(user: Identity, quackId: string, optionId: string): Promise<Poll> {
