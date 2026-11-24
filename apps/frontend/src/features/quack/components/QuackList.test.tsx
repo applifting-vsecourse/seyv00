@@ -9,7 +9,7 @@ import { renderWithRouter } from "@/test/renderWithRouter"
 import { QuackList } from "@/features/quack/components/QuackList"
 
 describe("QuackList", () => {
-  it("renders quacks with their author's info", async () => {
+  it("renders quacks with author info", async () => {
     await renderWithRouter(<QuackList quacks={[quack()]} />)
 
     expect(screen.getByText("quack quack")).toBeInTheDocument()
