@@ -50,3 +50,132 @@ jobs:
 
       - name: Build frontend
         run: pnpm frontend build
+
+  # Backend over real HTTP (supertest) against a real Postgres: *.int-spec.ts.
+  # The tests migrate their own database (quacker_test) and clean it between tests.
+  test-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: quacker
+          POSTGRES_PASSWORD: quacker
+          POSTGRES_DB: quacker_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U quacker -d quacker_test"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm backend prisma:generate
+
+      - name: Integration tests
+        run: pnpm backend test:int
+        env:
+          TEST_DATABASE_URL: postgresql://quacker:quacker@localhost:5433/quacker_test
+
+  # The whole app in a browser: database, backend and frontend, then the
+  # Playwright tests from apps/frontend/e2e against the seeded data.
+  test-e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: quacker
+          POSTGRES_PASSWORD: quacker
+          POSTGRES_DB: quacker
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U quacker -d quacker"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # apps/*/.env from .env.example: the backend on :4050 with the database
+      # on :5433, the frontend on :3050 talking to the backend.
+      - name: Create env files
+        run: pnpm env:check
+
+      - name: Migrate and seed the database
+        run: |
+          pnpm backend migrate
+          pnpm backend seed
+
+      - name: Install Playwright browser
+        run: pnpm frontend exec playwright install --with-deps chromium
+
+      - name: Start backend
+        run: |
+          pnpm backend start > backend.log 2>&1 &
+          for i in $(seq 1 90); do
+            curl -fs http://localhost:4050/api/health > /dev/null && exit 0
+            sleep 2
+          done
+          echo "Backend did not start"; cat backend.log; exit 1
+
+      - name: Start frontend
+        run: |
+          pnpm frontend dev > frontend.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -fs http://localhost:3050 > /dev/null && exit 0
+            sleep 2
+          done
+          echo "Frontend did not start"; cat frontend.log; exit 1
+
+      - name: E2E tests
+        run: pnpm frontend e2e
+
+      - name: Upload logs and Playwright results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results
+          path: |
+            backend.log
+            frontend.log
+            apps/frontend/test-results/
+          if-no-files-found: ignore
+
+  # Red when a PR removes or rewrites lines in existing tests (only additions
+  # are fine). Independent of the other jobs and deliberately NOT a required
+  # check: it shows on the PR but doesn't block the merge or the deploy.
+  test-changes:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Check that existing tests were only added to
+        run: bash scripts/check-test-changes.sh "origin/${{ github.base_ref }}"
