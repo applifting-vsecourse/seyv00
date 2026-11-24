@@ -1,4 +1,5 @@
 import {
+  LikeState,
   PollNotFoundError,
   PollOptionNotFoundError,
   QuackNotFoundError,
@@ -169,6 +170,25 @@ export class QuacksController {
       }
       throw error;
     }
+  }
+
+  // Not implemented yet (cases.md, ADR 0002): the service stubs throw.
+  @Put(':id/like')
+  @ApiOperation({ summary: 'Like a quack; liking it again changes nothing' })
+  async like(
+    @User() user: Identity,
+    @Param('id') quackId: string,
+  ): Promise<LikeState> {
+    return this.quacksService.likeQuack(user, quackId);
+  }
+
+  @Delete(':id/like')
+  @ApiOperation({ summary: 'Take your like back; nothing to take is fine' })
+  async unlike(
+    @User() user: Identity,
+    @Param('id') quackId: string,
+  ): Promise<LikeState> {
+    return this.quacksService.unlikeQuack(user, quackId);
   }
 
   @Put(':id/vote')

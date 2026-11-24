@@ -56,6 +56,16 @@ export type Quack = {
   // oldest first: the first REPLY_PREVIEW_COUNT in the feed, all of them in a
   // thread, none on a reply
   replies: Quack[];
+  // Likes (cases.md, ADR 0002). Optional only until the feature is
+  // implemented; then every quack carries both.
+  likeCount?: number;
+  likedByMe?: boolean;
+};
+
+// A quack's likes after a like or unlike, seen by the one who sent it.
+export type LikeState = {
+  likeCount: number;
+  likedByMe: boolean;
 };
 
 // What deleting did: the quack is gone, or it had replies and became a placeholder.

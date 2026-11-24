@@ -1,4 +1,5 @@
 import {
+  LikeState,
   Poll,
   PollNotFoundError,
   PollOptionNotFoundError,
@@ -137,6 +138,18 @@ export class QuacksService {
         `quack moderated adminId=${user.id} quackId=${quackId} authorId=${authorId}`,
       );
     }
+  }
+
+  /** Not implemented yet (cases.md, ADR 0002). */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async likeQuack(user: Identity, quackId: string): Promise<LikeState> {
+    throw new Error('not implemented');
+  }
+
+  /** Not implemented yet (cases.md, ADR 0002). */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async unlikeQuack(user: Identity, quackId: string): Promise<LikeState> {
+    throw new Error('not implemented');
   }
 
   async vote(user: Identity, quackId: string, optionId: string): Promise<Poll> {

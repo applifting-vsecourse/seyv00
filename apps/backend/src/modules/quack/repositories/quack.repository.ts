@@ -2,6 +2,7 @@ import { PrismaService } from '@/core/prisma/prisma.service';
 import { Prisma } from '@/generated/prisma/client';
 import {
   DeleteOutcome,
+  LikeState,
   Poll,
   Quack,
   QuackMood,
@@ -411,6 +412,30 @@ export class QuackRepository {
     });
     if (!quack?.userId) return null;
     return { authorId: quack.userId, parentId: quack.parentId };
+  }
+
+  /**
+   * Adds the user's like if it isn't there yet and returns the quack's likes
+   * afterwards, or null when there's no such quack or it is a placeholder.
+   * Not implemented yet (cases.md, ADR 0002).
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async likeQuack(quackId: string, userId: string): Promise<LikeState | null> {
+    throw new Error('not implemented');
+  }
+
+  /**
+   * Removes the user's like if it is there and returns the quack's likes
+   * afterwards, or null when there's no such quack or it is a placeholder.
+   * Not implemented yet (cases.md, ADR 0002).
+   */
+  async unlikeQuack(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    quackId: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    userId: string,
+  ): Promise<LikeState | null> {
+    throw new Error('not implemented');
   }
 
   /** The poll's answer ids, or null when there's no such quack or it isn't a poll. */
