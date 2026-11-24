@@ -1,4 +1,5 @@
 import {
+  LikeState,
   Poll,
   PollNotFoundError,
   PollOptionNotFoundError,
@@ -137,6 +138,27 @@ export class QuacksService {
         `quack moderated adminId=${user.id} quackId=${quackId} authorId=${authorId}`,
       );
     }
+  }
+
+  /**
+   * Likes a quack or a reply, the author's own included; liking again changes
+   * nothing. A deleted message (placeholder) can't be liked: not found.
+   */
+  async likeQuack(user: Identity, quackId: string): Promise<LikeState> {
+    // the liker is taken from the session, never from the request
+    const likes = await this.quackRepository.likeQuack(quackId, user.id);
+    if (!likes) throw new QuackNotFoundError();
+    return likes;
+  }
+
+  /**
+   * Takes the user's own like back; nothing to take back is fine. Nobody, an
+   * admin included, can remove someone else's like.
+   */
+  async unlikeQuack(user: Identity, quackId: string): Promise<LikeState> {
+    const likes = await this.quackRepository.unlikeQuack(quackId, user.id);
+    if (!likes) throw new QuackNotFoundError();
+    return likes;
   }
 
   async vote(user: Identity, quackId: string, optionId: string): Promise<Poll> {

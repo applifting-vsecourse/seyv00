@@ -1,4 +1,5 @@
 import {
+  LikeState,
   PollNotFoundError,
   PollOptionNotFoundError,
   QuackNotFoundError,
@@ -33,6 +34,7 @@ import {
 } from '@nestjs/swagger';
 import { CreateQuackDto } from './dto/create-quack.dto';
 import { CreateReplyDto } from './dto/create-reply.dto';
+import { LikeResponseDto } from './dto/like.response.dto';
 import { ListQuacksQueryDto } from './dto/list-quacks.query.dto';
 import { PollResponseDto } from './dto/poll.response.dto';
 import { QuackResponseDto } from './dto/quack.response.dto';
@@ -163,6 +165,51 @@ export class QuacksController {
   ): Promise<void> {
     try {
       await this.quacksService.deleteQuack(user, quackId);
+    } catch (error) {
+      if (error instanceof QuackNotFoundError) {
+        throw new NotFoundException(error.message);
+      }
+      throw error;
+    }
+  }
+
+  @Put(':id/like')
+  @ApiOperation({ summary: 'Like a quack; liking it again changes nothing' })
+  @ApiResponse({ status: 200, type: LikeResponseDto })
+  @ApiResponse({ status: 401, description: 'Not signed in' })
+  @ApiResponse({
+    status: 404,
+    description: 'No such quack, or it was deleted (placeholder)',
+  })
+  async like(
+    @User() user: Identity,
+    @Param('id') quackId: string,
+  ): Promise<LikeResponseDto> {
+    return this.withNotFound(() => this.quacksService.likeQuack(user, quackId));
+  }
+
+  @Delete(':id/like')
+  @ApiOperation({ summary: 'Take your like back; nothing to take is fine' })
+  @ApiResponse({ status: 200, type: LikeResponseDto })
+  @ApiResponse({ status: 401, description: 'Not signed in' })
+  @ApiResponse({
+    status: 404,
+    description: 'No such quack, or it was deleted (placeholder)',
+  })
+  async unlike(
+    @User() user: Identity,
+    @Param('id') quackId: string,
+  ): Promise<LikeResponseDto> {
+    return this.withNotFound(() =>
+      this.quacksService.unlikeQuack(user, quackId),
+    );
+  }
+
+  private async withNotFound(
+    change: () => Promise<LikeState>,
+  ): Promise<LikeResponseDto> {
+    try {
+      return LikeResponseDto.fromDomain(await change());
     } catch (error) {
       if (error instanceof QuackNotFoundError) {
         throw new NotFoundException(error.message);

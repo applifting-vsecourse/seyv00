@@ -93,6 +93,14 @@ export class QuackResponseDto {
   })
   replies!: QuackResponseDto[];
 
+  @ApiProperty({
+    description: 'How many people like it; 0 on a deleted quack',
+  })
+  likeCount!: number;
+
+  @ApiProperty({ description: 'Whether the signed-in user likes it' })
+  likedByMe!: boolean;
+
   static fromDomain(quack: Quack): QuackResponseDto {
     if (!quack.isDeleted && !quack.user) {
       throw new Error(
@@ -118,6 +126,9 @@ export class QuackResponseDto {
       parent: quack.parent,
       replyCount: quack.replyCount,
       replies: quack.replies.map(QuackResponseDto.fromDomain),
+      // only the count and the viewer's own like; who liked is never sent
+      likeCount: quack.likeCount ?? 0,
+      likedByMe: quack.likedByMe ?? false,
     };
   }
 }

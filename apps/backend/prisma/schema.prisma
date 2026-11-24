@@ -54,6 +54,7 @@ model Quack {
   // a quack with answers is a poll; the quack text is its question
   pollOptions PollOption[]
   pollVotes   PollVote[]
+  likes       QuackLike[]
 
   @@index([userId])
   // the replies of a thread, oldest first
@@ -92,6 +93,21 @@ model PollVote {
   @@index([optionId])
   @@index([userId])
   @@map("poll_vote")
+}
+
+// One like per person per quack (ADR 0002). The count is never stored: it is
+// counted from these rows when quacks are read, so it can't drift.
+model QuackLike {
+  quack     Quack    @relation(fields: [quackId], references: [id], onDelete: Cascade)
+  quackId   String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  createdAt DateTime @default(now())
+
+  // one like per person per quack — enforced by the database, not just the app
+  @@id([quackId, userId])
+  @@index([userId])
+  @@map("quack_like")
 }
 
 model Session {
@@ -143,18 +159,19 @@ model Verification {
 }
 
 model User {
-  id            String     @id
+  id            String      @id
   name          String
   email         String
   emailVerified Boolean
-  image         String?    @db.Text
+  image         String?     @db.Text
   createdAt     DateTime
   updatedAt     DateTime
   sessions      Session[]
   accounts      Account[]
   quacks        Quack[]
   pollVotes     PollVote[]
-  role          UserRole   @default(user)
+  quackLikes    QuackLike[]
+  role          UserRole    @default(user)
 
   username        String? @db.VarChar(50)
   displayUsername String? @db.VarChar(50)
